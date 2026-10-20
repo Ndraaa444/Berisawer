@@ -78,9 +78,9 @@ function Dashboard() {
         } else {
           const base = (session.user.email?.split('@')[0] ?? 'creator').toLowerCase().replace(/[^a-z0-9_]/g, '_').replace(/^_+|_+$/g, '').slice(0, 20) || 'creator'
           const suggested = `${base}_${session.user.id.replace(/-/g, '').slice(0, 6)}`.slice(0, 30)
-          const { error: insertError } = await supabase.from('creator_profiles').upsert({ id: session.user.id, display_name: base.slice(0, 48) || 'Creator', handle: suggested, bio: '', is_public: true }, { onConflict: 'id', ignoreDuplicates: true })
+          const { error: insertError } = await supabase!.from('creator_profiles').upsert({ id: session.user.id, display_name: base.slice(0, 48) || 'Creator', handle: suggested, bio: '', is_public: true }, { onConflict: 'id', ignoreDuplicates: true })
           if (insertError) throw insertError
-          const { data: latest, error: latestError } = await supabase.from('creator_profiles').select('display_name,handle,bio,is_public').eq('id', session.user.id).single()
+          const { data: latest, error: latestError } = await supabase!.from('creator_profiles').select('display_name,handle,bio,is_public').eq('id', session.user.id).single()
           if (latestError) throw latestError
           if (alive) { setProfileName(latest.display_name); setHandle(latest.handle); setBio(latest.bio ?? ''); setProfilePublic(Boolean(latest.is_public)) }
         }
@@ -227,7 +227,7 @@ function Dashboard() {
     setProfileLoading(true)
     setAuthMessage('Menyimpan profil kreator…')
     try {
-      const { error } = await supabase.from('creator_profiles').upsert({ id: userId, display_name: profileName.trim(), handle: cleanHandle, bio: bio.trim(), is_public: profilePublic, updated_at: new Date().toISOString() }, { onConflict: 'id' })
+      const { error } = await supabase!.from('creator_profiles').upsert({ id: userId, display_name: profileName.trim(), handle: cleanHandle, bio: bio.trim(), is_public: profilePublic, updated_at: new Date().toISOString() }, { onConflict: 'id' })
       if (error) throw error
       setHandle(cleanHandle)
       setSaved(true)
