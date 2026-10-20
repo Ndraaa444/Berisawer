@@ -7,12 +7,14 @@ import {
   ShieldCheck, Sparkles, Wallet, X,
 } from 'lucide-react'
 import { isSupabaseConfigured, supabase } from './lib/supabase'
+import LiveStudio from './LiveStudio'
 
-type Section = 'Overview' | 'Donations' | 'Overlay' | 'Settings'
+type Section = 'Overview' | 'Donations' | 'Overlay' | 'Live Studio' | 'Settings'
 const navigation: { label: Section; icon: typeof LayoutDashboard }[] = [
   { label: 'Overview', icon: LayoutDashboard },
   { label: 'Donations', icon: Heart },
   { label: 'Overlay', icon: MonitorPlay },
+  { label: 'Live Studio', icon: Radio },
   { label: 'Settings', icon: Settings },
 ]
 
@@ -151,6 +153,7 @@ function App() {
           {section === 'Overview' && <Overview onNavigate={setSection} />}
           {section === 'Donations' && <Donations />}
           {section === 'Overlay' && <Overlay url={overlayUrl} copied={copied} showUrl={showUrl} onCopy={copyOverlay} onToggleUrl={() => setShowUrl(!showUrl)} />}
+          {section === 'Live Studio' && <LiveStudio />}
           {section === 'Settings' && <SettingsPanel profileName={profileName} setProfileName={setProfileName} handle={handle} setHandle={setHandle} onSave={saveProfile} saved={saved} email={email} setEmail={setEmail} onLogin={sendMagicLink} authBusy={authBusy} userEmail={userEmail} />}
           <footer className="footer"><span>© 2026 Berisawer</span><span><span className="footer-dot" /> Sistem berjalan dalam mode preview</span></footer>
         </div>
