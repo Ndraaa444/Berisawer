@@ -1,4 +1,4 @@
-# Berisawer
+# Bagisawer
 
 Futuristic creator tipping dashboard and browser overlay, built with React, TypeScript, Vite, and an optional Supabase browser client.
 
@@ -35,7 +35,8 @@ npm run build
 
 ## Cloudflare Pages
 
-Project name: `berisawer`  
+Project name: `bagisawer`  
+Primary domain: `https://bagisawer.my.id` (DNS managed separately)  
 Build command: `npm run build`  
 Build output directory: `dist`  
 Production branch: `main`
