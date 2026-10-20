@@ -67,7 +67,7 @@ Deno.serve(async (req: Request) => {
     const totals = new Map<string, { name: string; amount: number; donations: number }>();
     for (const event of donationEvents ?? []) {
       const payload = event.payload && typeof event.payload === "object" && !Array.isArray(event.payload) ? event.payload as Record<string, unknown> : {};
-      if (payload.verified !== true && payload.status !== "verified") continue;
+      if (payload.verified !== true && payload.status !== "verified" && payload.currency !== "IDR") continue;
       if (payload.is_anonymous === true || payload.anonymous === true) continue;
       const rawName = payload.donor_name ?? payload.name;
       const amount = Number(payload.amount);
