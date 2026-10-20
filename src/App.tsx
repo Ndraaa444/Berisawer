@@ -64,7 +64,7 @@ function Dashboard() {
       }
       setProfileLoading(true)
       try {
-        const { data, error } = await supabase.from('creator_profiles')
+        const { data, error } = await supabase!.from('creator_profiles')
           .select('display_name,handle,bio,is_public')
           .eq('id', session.user.id).maybeSingle()
         if (error) throw error
