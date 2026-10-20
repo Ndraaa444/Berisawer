@@ -14,6 +14,9 @@ jobs:
   verify:
     name: Typecheck and build
     runs-on: ubuntu-latest
+    env:
+      VITE_SUPABASE_URL: https://zevlddhjuztlezkvndir.supabase.co
+      VITE_SUPABASE_ANON_KEY: sb_publishable_G9zDfn-gNEoEnidzMzdarQ_MR2ep-Gj
     timeout-minutes: 10
     steps:
       - name: Checkout
@@ -32,6 +35,9 @@ jobs:
   deploy-pages:
     name: Deploy to Cloudflare Pages (opt-in)
     needs: verify
+    env:
+      VITE_SUPABASE_URL: https://zevlddhjuztlezkvndir.supabase.co
+      VITE_SUPABASE_ANON_KEY: sb_publishable_G9zDfn-gNEoEnidzMzdarQ_MR2ep-Gj
     if: ${{ vars.CLOUDFLARE_PAGES_ENABLED == 'true' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
