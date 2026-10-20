@@ -4,6 +4,12 @@ import { supabase } from './lib/supabase'
 
 const DEFAULT_TEMPLATE = '{donor_name} mengirim {amount}. Pesan: {message}'
 type AlertConfig = { template: string; sound_url: string; sound_name: string; volume: number; tts_enabled: boolean; read_donor_message: boolean; sound_pack: string; language: string; voice_name: string }
+function chooseDefaultGoogleVoice(available: SpeechSynthesisVoice[], language: string) {
+  const local = available.filter(v => v.lang.toLowerCase().startsWith(language.slice(0, 2).toLowerCase()))
+  const google = local.filter(v => /google/i.test(v.name))
+  const female = (v: SpeechSynthesisVoice) => /female|woman|perempuan|wanita|wavenet-f|standard-c|studio-o/i.test(v.name)
+  return google.find(female) || google[0] || local.find(female) || local[0]
+}
 function playShine(volume: number) {
   try {
     const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
@@ -39,15 +45,23 @@ export default function AlertSoundSettings() {
   const [soundPack, setSoundPack] = useState('shine')
   const [language, setLanguage] = useState('id-ID')
   const [voiceName, setVoiceName] = useState('')
+  const [voiceWasSaved, setVoiceWasSaved] = useState(false)
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([])
   const [feedback, setFeedback] = useState('')
   useEffect(() => {
     if (!('speechSynthesis' in window)) return
-    const refresh = () => setVoices(window.speechSynthesis.getVoices().filter(v => v.lang.toLowerCase().startsWith(language.slice(0, 2).toLowerCase())))
+    const refresh = () => {
+      const available = window.speechSynthesis.getVoices().filter(v => v.lang.toLowerCase().startsWith(language.slice(0, 2).toLowerCase()))
+      setVoices(available)
+      if (!voiceWasSaved && !voiceName) {
+        const preferred = chooseDefaultGoogleVoice(available, language)
+        if (preferred) setVoiceName(preferred.name)
+      }
+    }
     refresh()
     window.speechSynthesis.addEventListener('voiceschanged', refresh)
     return () => window.speechSynthesis.removeEventListener('voiceschanged', refresh)
-  }, [language])
+  }, [language, voiceName, voiceWasSaved])
   useEffect(() => {
     let active = true
     async function load() {
@@ -60,7 +74,7 @@ export default function AlertSoundSettings() {
       if (active && cfg) {
         setTemplate(cfg.template || DEFAULT_TEMPLATE); setSoundUrl(cfg.sound_url || ''); setSoundName(cfg.sound_name || '')
         setVolume(Number(cfg.volume ?? 65)); setTts(cfg.tts_enabled !== false); setReadMessage(cfg.read_donor_message !== false)
-        setSoundPack(cfg.sound_pack || 'shine'); setLanguage(cfg.language || 'id-ID'); setVoiceName(cfg.voice_name || '')
+        setSoundPack(cfg.sound_pack || 'shine'); setLanguage(cfg.language || 'id-ID'); if (cfg.voice_name) { setVoiceName(cfg.voice_name); setVoiceWasSaved(true) }
       }
     }
     void load()
@@ -92,19 +106,19 @@ export default function AlertSoundSettings() {
     window.speechSynthesis.cancel()
     const utterance = new SpeechSynthesisUtterance(text)
     utterance.lang = language; utterance.volume = volume / 100
-    const selected = voices.find(v => v.name === voiceName)
+    const selected = voices.find(v => v.name === voiceName) || chooseDefaultGoogleVoice(voices, language)
     if (selected) utterance.voice = selected
     window.speechSynthesis.speak(utterance)
   }
   return <section className="panel live-config-panel">
-    <div className="panel-heading"><div><h2><Volume2 size={17} /> Audio Alert Berisawer</h2><p>Identitas suara orisinal Berisawer Shine</p></div></div>
+    <div className="panel-heading"><div><h2><Volume2 size={17} /> Audio Alert Berisawer</h2><p>Suara bawaan Google/perangkat; default perempuan jika tersedia</p></div></div>
     <div className="live-sound-meta"><Sparkles size={18} /><div><strong>Berisawer Shine</strong><small>Bunyi kristal digital lembut, disintesis langsung oleh Berisawer — bukan salinan audio platform lain.</small></div></div>
     <div className="live-field-footer"><button className="button button-secondary" onClick={() => playShine(volume)}><AudioLines size={15} /> Dengarkan Shine</button><button className="button button-secondary" onClick={() => void save({ sound_pack: 'shine' })}>Pakai Shine</button></div>
     <label className="field-label" htmlFor="alert-language">BAHASA TTS</label>
-    <select id="alert-language" className="live-select" value={language} onChange={e => { setLanguage(e.target.value); setVoiceName(''); void save({ language: e.target.value, voice_name: '' }) }}><option value="id-ID">Bahasa Indonesia</option><option value="en-US">English (US)</option></select>
-    <label className="field-label" htmlFor="alert-voice">SUARA TTS YANG TERSEDIA</label>
-    <select id="alert-voice" className="live-select" value={voiceName} onChange={e => { setVoiceName(e.target.value); void save({ voice_name: e.target.value }) }}><option value="">Suara default perangkat</option>{voices.map(v => <option key={v.name} value={v.name}>{v.name} · {v.lang}</option>)}</select>
-    <p className="field-help">Daftar suara berasal dari perangkat/browser yang sedang digunakan; pilihan suara bisa berbeda antarperangkat.</p>
+    <select id="alert-language" className="live-select" value={language} onChange={e => { const next = e.target.value; setLanguage(next); setVoiceName(''); setVoiceWasSaved(false); const preferred = chooseDefaultGoogleVoice(window.speechSynthesis?.getVoices() || [], next); if (preferred) setVoiceName(preferred.name); void save({ language: next, voice_name: preferred?.name || '' }) }}><option value="id-ID">Bahasa Indonesia</option><option value="en-US">English (US)</option></select>
+    <label className="field-label" htmlFor="alert-voice">SUARA BAWAAN PERANGKAT</label>
+    <select id="alert-voice" className="live-select" value={voiceName} onChange={e => { setVoiceName(e.target.value); setVoiceWasSaved(true); void save({ voice_name: e.target.value }) }}><option value="">Otomatis — Google jika tersedia</option>{voices.map(v => <option key={v.name} value={v.name}>{v.name} · {v.lang}{/google/i.test(v.name) ? ' · Google' : ''}</option>)}</select>
+    <p className="field-help">Berisawer tidak membuat suara AI sendiri. Pilihan suara diambil dari mesin TTS perangkat/browser. Sistem memprioritaskan suara Google dan nama suara yang menandakan perempuan jika tersedia. Browser tidak selalu memberikan informasi gender, jadi suara perempuan tidak dapat dijamin pada semua perangkat.</p>
     <label className="live-check-row"><input type="checkbox" checked={tts} onChange={e => { setTts(e.target.checked); void save({ tts_enabled: e.target.checked }) }} /><span><strong>Bacakan alert dengan TTS</strong><small>Pembacaan satu per satu melalui antrean.</small></span></label>
     <label className="live-check-row"><input type="checkbox" checked={readMessage} onChange={e => { setReadMessage(e.target.checked); void save({ read_donor_message: e.target.checked }) }} /><span><strong>Bacakan pesan supporter</strong><small>Pesan harus melewati moderasi terlebih dahulu.</small></span></label>
     <label className="field-label" htmlFor="alert-template">POLA TEKS</label>
