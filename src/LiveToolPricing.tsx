@@ -114,13 +114,6 @@ export default function LiveToolPricing() {
   const Toggle = ({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) => (
     <label className="pricing-toggle"><span>{label}</span><input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)} /><span className="pricing-switch" aria-hidden="true" /></label>
   )
-  const NumberField = ({ label, value, min = 0, max, suffix }: { label: string; value: number; min?: number; max?: number; suffix?: string }) => (
-    <label className="pricing-field"><span>{label}</span><div><input type="number" min={min} max={max} value={value} onChange={e => {
-      const input = e.target
-      const field = input.dataset.field
-      if (field) return
-    }} readOnly aria-label={label} /><span>{suffix ?? 'Rp'}</span></div></label>
-  )
   const moneyInput = (label: string, value: number, onChange: (value: number) => void, min = 1000) => (
     <label className="pricing-field"><span>{label}</span><div><span>Rp</span><input type="number" min={min} step="1000" value={value} onChange={e => onChange(Number(e.target.value))} /></div></label>
   )
@@ -147,7 +140,7 @@ export default function LiveToolPricing() {
       <article className="pricing-feature">
         <Toggle label="Media Share" checked={config.media.enabled} onChange={v => update('media', { enabled: v })} />
         {moneyInput('Minimal sawer media', config.media.min_amount, v => update('media', { min_amount: v }))}
-        {moneyInput('Tarif per detik', config.media.price_per_second, v => update('media', { price_per_second: v }, 0), 0)}
+        {moneyInput('Tarif per detik', config.media.price_per_second, v => update('media', { price_per_second: v }), 0)}
         {numberInput('Durasi maksimum media', config.media.max_duration_seconds, v => update('media', { max_duration_seconds: v }), 'detik', 5, 600)}
         <small className="pricing-calc">{rupiah(config.media.price_per_second)} per detik • 60 detik = {rupiah(config.media.price_per_second * 60)}</small>
       </article>
