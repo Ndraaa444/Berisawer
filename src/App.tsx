@@ -34,6 +34,8 @@ function Dashboard() {
   const [section, setSection] = useState<Section>('Overview')
   const [menuOpen, setMenuOpen] = useState(false)
   const [email, setEmail] = useState('')
+  const [otp, setOtp] = useState('')
+  const [otpSent, setOtpSent] = useState(false)
   const [authMessage, setAuthMessage] = useState('')
   const [authBusy, setAuthBusy] = useState(false)
   const [userEmail, setUserEmail] = useState<string | null>(null)
@@ -143,16 +145,35 @@ function Dashboard() {
       return
     }
     setAuthBusy(true)
-    setAuthMessage('')
+    setAuthMessage('Mengirim kode OTP…')
     try {
       const { error } = await supabase.auth.signInWithOtp({
         email: email.trim(),
-        options: { emailRedirectTo: window.location.origin },
+        options: { shouldCreateUser: true, emailRedirectTo: window.location.origin },
       })
       if (error) throw error
-      setAuthMessage('Jika pendaftaran email diizinkan, tautan masuk/daftar sudah dikirim. Periksa Inbox dan folder Spam; tautan akan membuka workspace Berisawer.')
+      setOtpSent(true)
+      setOtp('')
+      setAuthMessage('Kode OTP 6 digit dikirim jika email diizinkan. Periksa Inbox dan folder Spam, lalu masukkan kode di bawah. Pastikan template email Supabase menampilkan {{ .Token }}.')
     } catch (error) {
-      setAuthMessage('Gagal mengirim tautan: ' + (error instanceof Error ? error.message : 'periksa koneksi dan konfigurasi Supabase.'))
+      setAuthMessage('Gagal mengirim kode OTP: ' + (error instanceof Error ? error.message : 'periksa koneksi dan konfigurasi SMTP Supabase.'))
+    } finally { setAuthBusy(false) }
+  }
+
+  async function verifyEmailOtp(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!supabase) { setAuthMessage('Supabase belum dikonfigurasi.'); return }
+    if (!email.trim() || !/^\\d{6}$/.test(otp.trim())) { setAuthMessage('Masukkan kode OTP 6 digit yang dikirim ke email.'); return }
+    setAuthBusy(true)
+    setAuthMessage('Memverifikasi kode OTP…')
+    try {
+      const { error } = await supabase.auth.verifyOtp({ email: email.trim(), token: otp.trim(), type: 'email' })
+      if (error) throw error
+      setOtpSent(false)
+      setOtp('')
+      setAuthMessage('Email berhasil diverifikasi. Memuat workspace kreator…')
+    } catch (error) {
+      setAuthMessage('Kode OTP belum berhasil diverifikasi: ' + (error instanceof Error ? error.message : 'kode salah/kedaluwarsa. Coba kirim kode baru.'))
     } finally { setAuthBusy(false) }
   }
 
@@ -299,7 +320,7 @@ function Dashboard() {
           {section === 'Donations' && <Donations />}
           {section === 'Overlay' && <Overlay features={overlayFeatures} tokens={overlayTokens} busy={overlayBusy} copiedFeature={copiedFeature} showUrls={showUrls} urlFor={overlayUrl} onGenerate={generateOverlayTokens} onCopy={copyOverlay} onToggleUrl={feature => setShowUrls(current => ({ ...current, [feature]: !current[feature] }))} />}
           {section === 'Live Studio' && <LiveStudio />}
-          {section === 'Settings' && <SettingsPanel profileName={profileName} setProfileName={setProfileName} handle={handle} setHandle={setHandle} bio={bio} setBio={setBio} profilePublic={profilePublic} setProfilePublic={setProfilePublic} onSave={saveProfile} saved={saved} profileLoading={profileLoading} email={email} setEmail={setEmail} onLogin={sendMagicLink} authBusy={authBusy} userEmail={userEmail} />}
+          {section === 'Settings' && <SettingsPanel profileName={profileName} setProfileName={setProfileName} handle={handle} setHandle={setHandle} bio={bio} setBio={setBio} profilePublic={profilePublic} setProfilePublic={setProfilePublic} onSave={saveProfile} saved={saved} profileLoading={profileLoading} email={email} setEmail={setEmail} otp={otp} setOtp={setOtp} otpSent={otpSent} onLogin={sendMagicLink} onVerifyOtp={verifyEmailOtp} authBusy={authBusy} userEmail={userEmail} />}
           <footer className="footer"><span>© 2026 Berisawer</span><span><span className="footer-dot" /> Sistem berjalan dalam mode preview</span></footer>
         </div>
       </main>
@@ -383,8 +404,8 @@ function Overlay({ features, tokens, busy, copiedFeature, showUrls, urlFor, onGe
   </>
 }
 
-function SettingsPanel({ profileName, setProfileName, handle, setHandle, bio, setBio, profilePublic, setProfilePublic, onSave, saved, profileLoading, email, setEmail, onLogin, authBusy, userEmail }: {
-  profileName: string; setProfileName: (value: string) => void; handle: string; setHandle: (value: string) => void; bio: string; setBio: (value: string) => void; profilePublic: boolean; setProfilePublic: (value: boolean) => void; onSave: (event: FormEvent<HTMLFormElement>) => void; saved: boolean; profileLoading: boolean; email: string; setEmail: (value: string) => void; onLogin: (event: FormEvent<HTMLFormElement>) => void; authBusy: boolean; userEmail: string | null
+function SettingsPanel({ profileName, setProfileName, handle, setHandle, bio, setBio, profilePublic, setProfilePublic, onSave, saved, profileLoading, email, setEmail, otp, setOtp, otpSent, onLogin, onVerifyOtp, authBusy, userEmail }: {
+  profileName: string; setProfileName: (value: string) => void; handle: string; setHandle: (value: string) => void; bio: string; setBio: (value: string) => void; profilePublic: boolean; setProfilePublic: (value: boolean) => void; onSave: (event: FormEvent<HTMLFormElement>) => void; saved: boolean; profileLoading: boolean; email: string; setEmail: (value: string) => void; otp: string; setOtp: (value: string) => void; otpSent: boolean; onLogin: (event: FormEvent<HTMLFormElement>) => void; onVerifyOtp: (event: FormEvent<HTMLFormElement>) => void; authBusy: boolean; userEmail: string | null
 }) {
   return <>
     <PageHeading eyebrow="WORKSPACE CONFIGURATION" title="Pengaturan" description="Kelola profil creator dan sambungkan autentikasi Supabase." />
@@ -396,8 +417,8 @@ function SettingsPanel({ profileName, setProfileName, handle, setHandle, bio, se
       <div className="form-footer"><span className="helper-text">{userEmail ? (profilePublic ? `Publik: /creator/${handle || 'handle'}` : 'Profil privat') : 'Login diperlukan untuk menyimpan.'}</span><button className="button button-primary" type="submit" disabled={!userEmail || profileLoading}>{profileLoading ? 'Menyimpan…' : saved ? <Check size={15} /> : null}{saved ? 'Tersimpan' : 'Simpan profil'}</button></div></form>
     </section>
     <section className="panel settings-panel"><div className="panel-heading"><div><h2>Akun & autentikasi</h2><p>{isSupabaseConfigured ? 'Supabase client terkonfigurasi' : 'Menunggu konfigurasi environment'}</p></div><div className="settings-icon"><ShieldCheck size={18} /></div></div>
-      <div className="config-status"><span className={`config-dot ${isSupabaseConfigured ? 'configured' : ''}`} /><span><strong>{isSupabaseConfigured ? 'Supabase tersedia' : 'Supabase belum terkonfigurasi'}</strong><small>{userEmail ? `Masuk sebagai ${userEmail}` : 'Gunakan email untuk menerima tautan masuk.'}</small></span></div>
-      {!userEmail && <form onSubmit={onLogin}><label className="field-label" htmlFor="login-email">EMAIL</label><input id="login-email" className="form-input" type="email" autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="nama@email.com" required /><button className="button button-primary full-button" type="submit" disabled={authBusy}>{authBusy ? 'Mengirim tautan...' : 'Kirim magic link'}</button></form>}
+      <div className="config-status"><span className={`config-dot ${isSupabaseConfigured ? 'configured' : ''}`} /><span><strong>{isSupabaseConfigured ? 'Supabase tersedia' : 'Supabase belum terkonfigurasi'}</strong><small>{userEmail ? `Masuk sebagai ${userEmail}` : otpSent ? `Kode dikirim ke ${email}` : 'Masukkan email untuk menerima kode OTP 6 digit.'}</small></span></div>
+      {!userEmail && <><form onSubmit={onLogin}><label className="field-label" htmlFor="login-email">EMAIL</label><input id="login-email" className="form-input" type="email" autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="nama@email.com" required /><button className="button button-primary full-button" type="submit" disabled={authBusy}>{authBusy ? 'Memproses…' : otpSent ? 'Kirim ulang kode OTP' : 'Daftar / masuk dengan OTP'}</button></form>{otpSent && <form onSubmit={onVerifyOtp} style={{marginTop:16}}><label className="field-label" htmlFor="login-otp">KODE OTP 6 DIGIT</label><input id="login-otp" className="form-input" type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} value={otp} onChange={e => setOtp(e.target.value.replace(/\\D/g, '').slice(0, 6))} placeholder="123456" required /><button className="button button-primary full-button" type="submit" disabled={authBusy || !/^\\d{6}$/.test(otp)}>{authBusy ? 'Memverifikasi…' : 'Verifikasi kode & masuk'}</button></form>}</>}
       <div className="info-card compact"><ShieldCheck size={18} /><p>Frontend memakai public anon key saja. Pastikan RLS aktif pada tabel pengguna dan jangan pernah menaruh service-role key di sini.</p></div>
     </section></div>
     <section className="panel payment-panel"><div className="payment-lock"><ShieldCheck size={20} /></div><div><h2>Integrasi pembayaran</h2><p>QRIS, Midtrans, dan gateway lain tetap nonaktif sampai verifikasi merchant selesai dan pengujian webhook disetujui. Halaman publik saat ini hanya profil kreator; belum menerima atau mencatat pembayaran.</p></div><span className="notice-badge">DINONAKTIFKAN</span></section>
