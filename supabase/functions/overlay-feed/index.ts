@@ -43,8 +43,20 @@ Deno.serve(async (req: Request) => {
   const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!url || !key) return reply(503, { error: "server_not_configured" });
   const admin = createClient(url, key, { auth: { persistSession: false } });
-  const tokenHash = await sha256(token);
-  const { data: overlay, error: tokenError } = await admin.from("overlay_tokens").select("id,creator_id,label").eq("token_hash", tokenHash).is("revoked_at", null).maybeSingle();
+  // Stable overlay URLs use the random UUID row id as a bearer token.
+  // Legacy raw tokens remain supported by their SHA-256 hash during transition.
+  let overlay: { id: string; creator_id: string; label: string } | null = null;
+  let tokenError: unknown = null;
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(token)) {
+    const result = await admin.from("overlay_tokens").select("id,creator_id,label").eq("id", token).is("revoked_at", null).maybeSingle();
+    overlay = result.data;
+    tokenError = result.error;
+  } else {
+    const tokenHash = await sha256(token);
+    const result = await admin.from("overlay_tokens").select("id,creator_id,label").eq("token_hash", tokenHash).is("revoked_at", null).maybeSingle();
+    overlay = result.data;
+    tokenError = result.error;
+  }
   if (tokenError || !overlay) return reply(401, { error: "invalid_overlay_token" });
   const { data: settings } = await admin.from("creator_settings").select("live_tools_config").eq("user_id", overlay.creator_id).maybeSingle();
   const moderation = settings?.live_tools_config?.moderation;
@@ -67,7 +79,7 @@ Deno.serve(async (req: Request) => {
     const totals = new Map<string, { name: string; amount: number; donations: number }>();
     for (const event of donationEvents ?? []) {
       const payload = event.payload && typeof event.payload === "object" && !Array.isArray(event.payload) ? event.payload as Record<string, unknown> : {};
-      if (payload.verified !== true && payload.status !== "verified" && payload.currency !== "IDR") continue;
+      if (payload.verified !== true && payload.status !== "verified") continue;
       if (payload.is_anonymous === true || payload.anonymous === true) continue;
       const rawName = payload.donor_name ?? payload.name;
       const amount = Number(payload.amount);

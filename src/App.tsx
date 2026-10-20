@@ -39,7 +39,6 @@ function Dashboard() {
   const [profileName, setProfileName] = useState('Creator')
   const [handle, setHandle] = useState('creator-kamu')
   const [overlayTokens, setOverlayTokens] = useState<Record<string, string>>({})
-  const [overlayFeature, setOverlayFeature] = useState('alerts')
   const [overlayBusy, setOverlayBusy] = useState(false)
   const [showUrls, setShowUrls] = useState<Record<string, boolean>>({})
   const [copiedFeature, setCopiedFeature] = useState('')
@@ -53,6 +52,36 @@ function Dashboard() {
     })
     return () => listener.subscription.unsubscribe()
   }, [])
+
+  useEffect(() => {
+    if (!supabase || !userEmail) {
+      setOverlayTokens({})
+      return
+    }
+    let cancelled = false
+    async function loadOverlayTokens() {
+      const { data: auth } = await supabase!.auth.getUser()
+      if (!auth.user) return
+      const { data, error } = await supabase!.from('overlay_tokens')
+        .select('id,label,revoked_at,created_at')
+        .eq('creator_id', auth.user.id)
+        .is('revoked_at', null)
+        .like('label', 'overlay:%')
+        .order('created_at', { ascending: false })
+      if (error) {
+        if (!cancelled) setAuthMessage('Token overlay belum bisa dimuat: ' + error.message)
+        return
+      }
+      const loaded: Record<string, string> = {}
+      for (const row of data ?? []) {
+        const feature = typeof row.label === 'string' ? row.label.slice('overlay:'.length) : ''
+        if (feature && !loaded[feature]) loaded[feature] = row.id
+      }
+      if (!cancelled) setOverlayTokens(loaded)
+    }
+    void loadOverlayTokens()
+    return () => { cancelled = true }
+  }, [userEmail])
 
   const overlayFeatures = [
     { key: 'alerts', title: 'Alert Donasi', description: 'Notifikasi dukungan dan animasi event' },
@@ -89,24 +118,48 @@ function Dashboard() {
     setAuthMessage('')
   }
 
-  async function generateOverlayToken(feature: string) {
+  async function generateOverlayTokens() {
     if (!supabase) { setAuthMessage('Supabase belum dikonfigurasi.'); return }
     setOverlayBusy(true)
     setAuthMessage('')
     try {
       const { data: auth, error: authError } = await supabase.auth.getUser()
       if (authError || !auth.user) throw new Error('Masuk ke akun kreator terlebih dahulu.')
-      const bytes = crypto.getRandomValues(new Uint8Array(32))
-      const token = Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('')
-      const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token))
-      const tokenHash = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('')
-      const { error } = await supabase.from('overlay_tokens').insert({ creator_id: auth.user.id, token_hash: tokenHash, label: 'overlay:' + feature })
-      if (error) throw error
-      setOverlayTokens(current => ({ ...current, [feature]: token }))
-      setShowUrls(current => ({ ...current, [feature]: true }))
-      setAuthMessage('Token overlay ' + feature + ' berhasil dibuat. Salin URL sekarang; token mentah hanya tersedia di sesi ini.')
+      const { data: existing, error: listError } = await supabase.from('overlay_tokens')
+        .select('id,label,created_at')
+        .eq('creator_id', auth.user.id)
+        .is('revoked_at', null)
+        .like('label', 'overlay:%')
+        .order('created_at', { ascending: false })
+      if (listError) throw listError
+      const nextTokens: Record<string, string> = {}
+      for (const row of existing ?? []) {
+        const feature = typeof row.label === 'string' ? row.label.slice('overlay:'.length) : ''
+        if (feature && !nextTokens[feature]) nextTokens[feature] = row.id
+      }
+      const missing = overlayFeatures.filter(feature => !nextTokens[feature.key])
+      if (missing.length) {
+        const inserts = await Promise.all(missing.map(async feature => {
+          const bytes = crypto.getRandomValues(new Uint8Array(32))
+          const randomSecret = Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('')
+          const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(randomSecret))
+          const tokenHash = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('')
+          return { creator_id: auth.user!.id, token_hash: tokenHash, label: 'overlay:' + feature.key }
+        }))
+        const { data: created, error } = await supabase.from('overlay_tokens').insert(inserts).select('id,label')
+        if (error) throw error
+        for (const row of created ?? []) {
+          const feature = typeof row.label === 'string' ? row.label.slice('overlay:'.length) : ''
+          if (feature) nextTokens[feature] = row.id
+        }
+      }
+      setOverlayTokens(nextTokens)
+      setShowUrls(Object.fromEntries(overlayFeatures.map(feature => [feature.key, true])))
+      setAuthMessage(missing.length
+        ? 'Token stabil siap untuk semua fitur. URL memakai ID token acak yang tersimpan di backend; menyimpan setting tidak mengganti token.'
+        : 'Semua token overlay sudah ada. URL tetap sama dan tidak dibuat ulang.')
     } catch (error) {
-      setAuthMessage(error instanceof Error ? error.message : 'Token overlay gagal dibuat. Periksa login dan izin RLS.')
+      setAuthMessage(error instanceof Error ? error.message : 'Token overlay gagal dimuat/dibuat. Periksa login dan izin RLS.')
     } finally { setOverlayBusy(false) }
   }
 
@@ -185,7 +238,7 @@ function Dashboard() {
 
           {section === 'Overview' && <Overview onNavigate={setSection} />}
           {section === 'Donations' && <Donations />}
-          {section === 'Overlay' && <Overlay features={overlayFeatures} tokens={overlayTokens} selected={overlayFeature} onSelect={setOverlayFeature} busy={overlayBusy} copiedFeature={copiedFeature} showUrls={showUrls} urlFor={overlayUrl} onGenerate={generateOverlayToken} onCopy={copyOverlay} onToggleUrl={feature => setShowUrls(current => ({ ...current, [feature]: !current[feature] }))} />}
+          {section === 'Overlay' && <Overlay features={overlayFeatures} tokens={overlayTokens} busy={overlayBusy} copiedFeature={copiedFeature} showUrls={showUrls} urlFor={overlayUrl} onGenerate={generateOverlayTokens} onCopy={copyOverlay} onToggleUrl={feature => setShowUrls(current => ({ ...current, [feature]: !current[feature] }))} />}
           {section === 'Live Studio' && <LiveStudio />}
           {section === 'Settings' && <SettingsPanel profileName={profileName} setProfileName={setProfileName} handle={handle} setHandle={setHandle} onSave={saveProfile} saved={saved} email={email} setEmail={setEmail} onLogin={sendMagicLink} authBusy={authBusy} userEmail={userEmail} />}
           <footer className="footer"><span>© 2026 Berisawer</span><span><span className="footer-dot" /> Sistem berjalan dalam mode preview</span></footer>
@@ -243,32 +296,31 @@ function Donations() {
 }
 
 type OverlayFeature = { key: string; title: string; description: string }
-function Overlay({ features, tokens, selected, onSelect, busy, copiedFeature, showUrls, urlFor, onGenerate, onCopy, onToggleUrl }: {
-  features: OverlayFeature[]; tokens: Record<string, string>; selected: string; onSelect: (feature: string) => void
+function Overlay({ features, tokens, busy, copiedFeature, showUrls, urlFor, onGenerate, onCopy, onToggleUrl }: {
+  features: OverlayFeature[]; tokens: Record<string, string>
   busy: boolean; copiedFeature: string; showUrls: Record<string, boolean>; urlFor: (feature: string) => string
-  onGenerate: (feature: string) => void; onCopy: (feature: string) => void; onToggleUrl: (feature: string) => void
+  onGenerate: () => void; onCopy: (feature: string) => void; onToggleUrl: (feature: string) => void
 }) {
+  const readyCount = features.filter(feature => Boolean(tokens[feature.key])).length
   return <>
-    <PageHeading eyebrow="STREAMING TOOLS" title="Overlay per fitur" description="Buat URL Browser Source terpisah untuk setiap fitur, lalu atur posisi dan ukurannya sendiri di OBS." action={<span className="status-tag status-muted">PAYMENT SAFE</span>} />
-    <div className="info-card"><MonitorPlay size={19} /><div><strong>Pasang hanya fitur yang diperlukan</strong><p>Setiap URL memiliki token sendiri. Tambahkan masing-masing sebagai Browser Source terpisah di OBS agar posisi Alert, Running Text, Timer, dan Leaderboard bisa diatur secara independen.</p></div></div>
-    <div className="overlay-layout">
-      <section className="panel overlay-config">
-        <div className="panel-heading"><div><h2>Generator URL overlay</h2><p>Pilih fitur lalu buat token aman khusus fitur tersebut.</p></div><div className="overlay-icon"><Link2 size={19} /></div></div>
-        <label className="field-label" htmlFor="overlay-feature">PILIH FITUR</label>
-        <select id="overlay-feature" className="form-input" value={selected} onChange={event => onSelect(event.target.value)}>{features.map(feature => <option key={feature.key} value={feature.key}>{feature.title}</option>)}</select>
-        <p className="field-help">{features.find(feature => feature.key === selected)?.description}</p>
-        <label className="field-label">URL BROWSER SOURCE</label>
-        <div className="url-field"><Link2 size={16} /><input readOnly type={showUrls[selected] ? 'text' : 'password'} value={urlFor(selected)} aria-label={'URL overlay ' + selected} /><button className="icon-button" onClick={() => onToggleUrl(selected)} aria-label={showUrls[selected] ? 'Sembunyikan URL' : 'Tampilkan URL'}>{showUrls[selected] ? <EyeOff size={16} /> : <Eye size={16} />}</button></div>
-        <div className="url-actions"><button className="button button-primary" onClick={() => onGenerate(selected)} disabled={busy}>{busy ? 'Membuat token…' : tokens[selected] ? 'Buat ulang token fitur ini' : 'Buat URL fitur ini'}</button><button className="button button-secondary" onClick={() => onCopy(selected)} disabled={!tokens[selected]}>{copiedFeature === selected ? <Check size={15} /> : <Copy size={15} />}{copiedFeature === selected ? 'Tersalin' : 'Salin URL'}</button></div>
-        <span className="helper-text">{tokens[selected] ? 'Token tersedia di sesi ini. Simpan URL sekarang; token mentah tidak dapat dipulihkan setelah halaman dimuat ulang.' : 'Login diperlukan untuk membuat token. Buat token terpisah untuk tiap fitur.'}</span>
-        <div className="divider-line" /><h3>Pengaturan Browser Source OBS</h3><div className="obs-settings"><div><span>Lebar awal</span><strong>1920 px</strong></div><div><span>Tinggi awal</span><strong>1080 px</strong></div><div><span>FPS</span><strong>30</strong></div></div>
-      </section>
-      <section className="panel overlay-config">
-        <div className="panel-heading"><div><h2>Daftar overlay</h2><p>Status URL pada sesi browser ini.</p></div><div className="overlay-icon"><MonitorPlay size={19} /></div></div>
-        <div className="overlay-feature-list">{features.map(feature => <div key={feature.key} className="overlay-feature-row"><div className="overlay-feature-copy"><strong>{feature.title}</strong><span>{feature.description}</span></div><span className={tokens[feature.key] ? 'tiny-state done' : 'tiny-state pending'}>{tokens[feature.key] ? 'URL SIAP' : 'BELUM ADA'}</span><button className="button button-secondary" onClick={() => onSelect(feature.key)}>Kelola</button></div>)}</div>
-        <div className="info-card compact"><ShieldCheck size={18} /><p>Setiap fitur memakai token berbeda. Membuat token baru belum otomatis mencabut token sebelumnya.</p></div>
-      </section>
-    </div>
+    <PageHeading eyebrow="STREAMING TOOLS" title="Overlay per fitur" description="Semua URL overlay ada di satu tempat. Simpan pengaturan visual tanpa mengubah token atau URL OBS." action={<span className="status-tag status-muted">PAYMENT SAFE</span>} />
+    <div className="info-card"><MonitorPlay size={19} /><div><strong>Token tetap untuk setiap fitur</strong><p>Token dibuat sekali per fitur dan dimuat kembali saat creator login. Mengubah atau menyimpan setting tidak membuat token baru. Setiap URL dapat dipasang sebagai Browser Source OBS terpisah.</p></div></div>
+    <section className="panel overlay-config">
+      <div className="panel-heading"><div><h2>URL Browser Source</h2><p>{readyCount} dari {features.length} token tersedia</p></div><div className="overlay-icon"><Link2 size={19} /></div></div>
+      <div className="overlay-feature-list">
+        {features.map(feature => <div key={feature.key} className="overlay-feature-row">
+          <div className="overlay-feature-copy"><strong>{feature.title}</strong><span>{feature.description}</span></div>
+          <div className="url-field"><Link2 size={15} /><input readOnly type={showUrls[feature.key] ? 'text' : 'password'} value={tokens[feature.key] ? urlFor(feature.key) : 'Token belum dibuat'} aria-label={'URL overlay ' + feature.key} /><button className="icon-button" onClick={() => onToggleUrl(feature.key)} aria-label={showUrls[feature.key] ? 'Sembunyikan URL' : 'Tampilkan URL'} disabled={!tokens[feature.key]}>{showUrls[feature.key] ? <EyeOff size={16} /> : <Eye size={16} />}</button></div>
+          <div className="overlay-row-actions">
+            <span className={tokens[feature.key] ? 'tiny-state done' : 'tiny-state pending'}>{tokens[feature.key] ? 'TOKEN TETAP' : 'BELUM ADA'}</span>
+            <button className="button button-secondary" onClick={() => onCopy(feature.key)} disabled={!tokens[feature.key]}>{copiedFeature === feature.key ? <Check size={15} /> : <Copy size={15} />}{copiedFeature === feature.key ? 'Tersalin' : 'Salin URL'}</button>
+          </div>
+        </div>)}
+      </div>
+      <div className="url-actions"><button className="button button-primary" onClick={onGenerate} disabled={busy}>{busy ? 'Memeriksa / membuat token…' : readyCount === features.length ? 'Muat ulang daftar token' : 'Buat semua token yang belum ada'}</button></div>
+      <span className="helper-text">Tombol ini hanya membuat token yang belum tersedia; token yang sudah ada tidak diganti. Simpan URL di OBS sekali saja.</span>
+      <div className="divider-line" /><h3>Pengaturan Browser Source OBS</h3><div className="obs-settings"><div><span>Lebar awal</span><strong>1920 px</strong></div><div><span>Tinggi awal</span><strong>1080 px</strong></div><div><span>FPS</span><strong>30</strong></div></div>
+    </section>
   </>
 }
 
