@@ -100,8 +100,10 @@ Deno.serve(async (req: Request) => {
     media: ["media"], subathon: ["subathon"], goals: ["goal"], polls: ["poll"], requests: ["request"],
   };
   if (!eventTypes[requestedFeature]) return reply(400, { error: "unsupported_overlay_feature" });
-  let query = admin.from("overlay_events").select("id,event_type,payload,created_at").eq("creator_id", overlay.creator_id).in("event_type", eventTypes[requestedFeature]).order("created_at", { ascending: true }).limit(25);
-  if (after) query = query.gt("created_at", after);
+  let query = admin.from("overlay_events").select("id,event_type,payload,created_at").eq("creator_id", overlay.creator_id).in("event_type", eventTypes[requestedFeature]).order("created_at", { ascending: true }).order("id", { ascending: true }).limit(25);
+  const afterId = params.get("after_id");
+  if (after && afterId) query = query.or(`created_at.gt.${after},and(created_at.eq.${after},id.gt.${afterId})`);
+  else if (after) query = query.gt("created_at", after);
   const { data, error } = await query;
   if (error) return reply(500, { error: "feed_unavailable" });
   const events = (data ?? []).flatMap((event) => {
@@ -110,5 +112,6 @@ Deno.serve(async (req: Request) => {
     return moderated ? [{ ...event, payload: moderated }] : [];
   });
   await admin.from("overlay_tokens").update({ last_used_at: new Date().toISOString() }).eq("id", overlay.id);
-  return reply(200, { events, server_time: new Date().toISOString() });
+  const lastScanned = data?.length ? data[data.length - 1] : null;
+  return reply(200, { events, cursor: lastScanned ? { created_at: lastScanned.created_at, id: lastScanned.id } : null, server_time: new Date().toISOString() });
 });
