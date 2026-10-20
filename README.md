@@ -37,6 +37,7 @@ npm run build
 
 Project name: `bagisawer`  
 Primary domain: `https://bagisawer.my.id` (DNS managed separately)  
+Cloudflare zone nameservers assigned: `bowen.ns.cloudflare.com`, `elinore.ns.cloudflare.com`  
 Build command: `npm run build`  
 Build output directory: `dist`  
 Production branch: `main`
