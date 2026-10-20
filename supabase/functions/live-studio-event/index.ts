@@ -34,24 +34,30 @@ Deno.serve(async (req: Request) => {
   if (authError || !authData.user) return reply(401, { error: "invalid_session" });
   let body: any;
   try { body = await req.json(); } catch { return reply(400, { error: "invalid_json" }); }
-  if (body?.event_type !== "ticker") return reply(400, { error: "unsupported_event_type" });
-  const text = String(body?.payload?.text ?? "").trim();
-  if (!text || text.length > 280) return reply(400, { error: "invalid_ticker_text" });
+  const type = String(body?.event_type ?? "");
+  if (!["ticker", "demo_alert"].includes(type)) return reply(400, { error: "unsupported_event_type" });
   const { data: settings, error: settingsError } = await admin.from("creator_settings").select("live_tools_config").eq("user_id", authData.user.id).maybeSingle();
   if (settingsError) return reply(500, { error: "settings_unavailable" });
   const config = settings?.live_tools_config ?? {};
-  if (config?.tool_switches?.ticker === false || config?.ticker?.enabled === false) return reply(403, { error: "ticker_disabled" });
-  const maxChars = Math.max(10, Math.min(280, Number(config?.ticker?.max_chars) || 120));
-  if (text.length > maxChars) return reply(400, { error: "ticker_too_long", max_chars: maxChars });
-  const moderation = config?.moderation;
-  const rules = moderation?.enabled === true && Array.isArray(moderation.rules) ? moderation.rules.slice(0, 200) : [];
-  const moderatedText = moderate(text, rules);
-  if (moderatedText === null) return reply(422, { error: "message_blocked_by_moderation" });
-  const { data: event, error: insertError } = await admin.from("overlay_events").insert({
-    creator_id: authData.user.id,
-    event_type: "ticker",
-    payload: { text: moderatedText, display_seconds: Math.max(3, Math.min(120, Number(config?.ticker?.display_seconds) || 10)) }
-  }).select("id,event_type,created_at").single();
+  const rules = config?.moderation?.enabled === true && Array.isArray(config?.moderation?.rules) ? config.moderation.rules.slice(0, 200) : [];
+  if (type === "ticker") {
+    const text = String(body?.payload?.text ?? "").trim();
+    if (!text || text.length > 280) return reply(400, { error: "invalid_ticker_text" });
+    if (config?.tool_switches?.ticker === false || config?.ticker?.enabled === false) return reply(403, { error: "ticker_disabled" });
+    const maxChars = Math.max(10, Math.min(280, Number(config?.ticker?.max_chars) || 120));
+    if (text.length > maxChars) return reply(400, { error: "ticker_too_long", max_chars: maxChars });
+    const moderatedText = moderate(text, rules);
+    if (moderatedText === null) return reply(422, { error: "message_blocked_by_moderation" });
+    const { data: event, error: insertError } = await admin.from("overlay_events").insert({ creator_id: authData.user.id, event_type: "ticker", payload: { text: moderatedText, display_seconds: Math.max(3, Math.min(120, Number(config?.ticker?.display_seconds) || 10)) } }).select("id,event_type,created_at").single();
+    if (insertError || !event) return reply(500, { error: "event_create_failed" });
+    return reply(201, { event, message: "Running text event added to the overlay queue." });
+  }
+  // Synthetic test event only: never creates a donation row or payment transaction.
+  if (config?.tool_switches?.alerts === false || config?.alerts?.enabled === false) return reply(403, { error: "alerts_disabled" });
+  const demoMessage = String(body?.payload?.message ?? "Ini adalah alert demo Berisawer. Tidak ada pembayaran yang dilakukan.").trim().slice(0, 240);
+  const safeMessage = moderate(demoMessage, rules);
+  if (safeMessage === null) return reply(422, { error: "message_blocked_by_moderation" });
+  const { data: event, error: insertError } = await admin.from("overlay_events").insert({ creator_id: authData.user.id, event_type: "alert", payload: { demo: true, donor_name: "Supporter Demo", amount: 10000, message: safeMessage, display_seconds: 8 } }).select("id,event_type,created_at").single();
   if (insertError || !event) return reply(500, { error: "event_create_failed" });
-  return reply(201, { event, message: "Running text event added to the overlay queue." });
+  return reply(201, { event, demo: true, message: "Alert demo queued; no payment or donation record created." });
 });
