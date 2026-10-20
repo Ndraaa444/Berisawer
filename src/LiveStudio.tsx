@@ -108,10 +108,26 @@ export default function LiveStudio() {
     setMessage('Permintaan contoh ditambahkan ke antrean moderasi.')
   }
 
-  function publishTicker() {
-    if (!tickerDraft.trim()) return
-    setTicker(tickerDraft.trim().slice(0, 180))
-    setMessage('Running text diperbarui untuk preview lokal.')
+  async function publishTicker() {
+    const text = tickerDraft.trim()
+    if (!text) return
+    if (userId && supabase) {
+      setMessage('Mengirim running text ke antrean overlay…')
+      const { data, error } = await supabase.functions.invoke('live-studio-event', { body: { event_type: 'ticker', payload: { text } } })
+      if (error || !data?.event) {
+        setMessage(data?.error === 'message_blocked_by_moderation'
+          ? 'Pesan ditolak oleh filter moderasi.'
+          : data?.error === 'ticker_disabled'
+            ? 'Running Text sedang nonaktif di pengaturan fitur/tarif.'
+            : 'Running Text gagal dikirim ke server; cek status fitur, login, dan koneksi.')
+        return
+      }
+      setTicker(text.slice(0, 180))
+      setMessage('Running Text masuk ke antrean overlay Supabase.')
+      return
+    }
+    setTicker(text.slice(0, 180))
+    setMessage('Preview lokal diperbarui. Login diperlukan untuk mengirim event ke overlay live.')
   }
 
   function addTimer() {
