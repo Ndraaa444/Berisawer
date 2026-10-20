@@ -1,4 +1,4 @@
-name: Berisawer CI
+name: Bagisawer CI
 
 on:
   push:
@@ -53,7 +53,7 @@ jobs:
       - name: Build production assets
         run: npm run build
       - name: Deploy to Cloudflare Pages
-        run: npx wrangler pages deploy dist --project-name=berisawer --branch=main
+        run: npx wrangler pages deploy dist --project-name=bagisawer --branch=main
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
