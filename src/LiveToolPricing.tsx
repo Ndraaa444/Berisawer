@@ -97,9 +97,13 @@ export default function LiveToolPricing() {
     setConfig(safeConfig)
     try {
       if (userId && supabase) {
-        const { error } = await supabase.from('creator_settings').upsert({ user_id: userId, live_tools_config: safeConfig }, { onConflict: 'user_id' })
+        const { data, error: readError } = await supabase.from('creator_settings').select('live_tools_config').eq('user_id', userId).maybeSingle()
+        if (readError) throw readError
+        const existing = data?.live_tools_config && typeof data.live_tools_config === 'object' ? data.live_tools_config : {}
+        const mergedConfig = { ...existing, ...safeConfig, moderation: existing.moderation }
+        const { error } = await supabase.from('creator_settings').upsert({ user_id: userId, live_tools_config: mergedConfig }, { onConflict: 'user_id' })
         if (error) throw error
-        setFeedback('Pengaturan harga berhasil disimpan ke akun Supabase.')
+        setFeedback('Pengaturan harga tersimpan; aturan moderasi yang sudah ada tetap dipertahankan.')
       } else {
         localStorage.setItem(storageKey(null), JSON.stringify(safeConfig))
         setFeedback('Tersimpan di browser preview ini saja. Masuk dengan akun untuk menyimpan ke Supabase.')
