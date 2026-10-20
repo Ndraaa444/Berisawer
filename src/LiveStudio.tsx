@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import {
-  Activity, AudioLines, Check, Clock3, Eye, MessageSquareText, MonitorPlay,
+  Activity, AudioLines, Check, Clock3, MessageSquareText, MonitorPlay,
   Music2, Plus, Radio, ShieldCheck, Sparkles, Timer, ToggleLeft, ToggleRight,
   Trash2, Trophy, Volume2, Zap,
 } from 'lucide-react'
