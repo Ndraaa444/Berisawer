@@ -1,0 +1,75 @@
+name: Laporan bug beta
+description: Laporkan masalah saat mencoba Berisawer beta.
+title: "[BUG BETA] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Jangan sertakan kata sandi, token overlay lengkap, anon key, data pribadi supporter, atau informasi pembayaran.
+  - type: input
+    id: page
+    attributes:
+      label: Halaman/fitur
+      description: Contoh: daftar, profil kreator, Live Studio, overlay Alerts
+      placeholder: "Overlay Alerts"
+    validations:
+      required: true
+  - type: dropdown
+    id: device
+    attributes:
+      label: Perangkat
+      options:
+        - iPhone / iPad
+        - Android
+        - Windows
+        - macOS
+        - Linux
+        - Lainnya
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser / OBS
+      placeholder: "Safari iOS 18 / OBS Browser Source"
+    validations:
+      required: true
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Dampak
+      options:
+        - "P1 - tidak bisa daftar/login"
+        - "P2 - fitur utama tidak berfungsi"
+        - "P3 - tampilan/masalah kecil"
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Langkah memunculkan bug
+      description: Tulis langkah bernomor agar bisa diulang.
+      placeholder: "1. Buka ...\n2. Tekan ...\n3. Hasilnya ..."
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Hasil yang diharapkan
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Hasil yang terjadi
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: Informasi tambahan
+      description: Pesan error boleh, tetapi hapus email pribadi, token, dan data sensitif.
+      render: text
+    validations:
+      required: false
