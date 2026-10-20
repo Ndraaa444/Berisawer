@@ -63,6 +63,18 @@ Deno.serve(async (req: Request) => {
   const rules: ModerationRule[] = moderation?.enabled === true && Array.isArray(moderation.rules)
     ? moderation.rules.filter((r: any) => r && typeof r.phrase === "string" && ["reject", "mask", "hide"].includes(r.action)).slice(0, 200)
     : [];
+  const { data: alertSettings } = await admin.from("creator_settings").select("live_tools_config").eq("user_id", overlay.creator_id).maybeSingle();
+  const rawAlerts = alertSettings?.live_tools_config?.alerts && typeof alertSettings.live_tools_config.alerts === "object" ? alertSettings.live_tools_config.alerts : {};
+  const alertConfig = {
+    volume: Math.max(0, Math.min(100, Number(rawAlerts.volume ?? 65))),
+    tts_enabled: rawAlerts.tts_enabled !== false,
+    read_donor_message: rawAlerts.read_donor_message !== false,
+    language: rawAlerts.language === "en-US" ? "en-US" : "id-ID",
+    voice_name: typeof rawAlerts.voice_name === "string" ? rawAlerts.voice_name.slice(0, 120) : "",
+    template: typeof rawAlerts.template === "string" ? rawAlerts.template.slice(0, 240) : "{donor_name} mengirim {amount}. Pesan: {message}",
+    sound_url: typeof rawAlerts.sound_url === "string" && rawAlerts.sound_url.startsWith("https://") ? rawAlerts.sound_url : "",
+    sound_pack: rawAlerts.sound_pack === "upload" && typeof rawAlerts.sound_url === "string" ? "upload" : "shine",
+  };
   const params = new URL(req.url).searchParams;
   const requestedFeature = params.get("feature") ?? "all";
   const tokenFeature = typeof overlay.label === "string" && overlay.label.startsWith("overlay:")
@@ -90,7 +102,7 @@ Deno.serve(async (req: Request) => {
     }
     const leaderboard = [...totals.values()].sort((a, b) => b.amount - a.amount).slice(0, 10);
     await admin.from("overlay_tokens").update({ last_used_at: new Date().toISOString() }).eq("id", overlay.id);
-    return reply(200, { leaderboard, period_days: 30, server_time: new Date().toISOString() });
+    return reply(200, { leaderboard, period_days: 30, alert_config: alertConfig, server_time: new Date().toISOString() });
   }
 
   const after = params.get("after");
@@ -113,5 +125,5 @@ Deno.serve(async (req: Request) => {
   });
   await admin.from("overlay_tokens").update({ last_used_at: new Date().toISOString() }).eq("id", overlay.id);
   const lastScanned = data?.length ? data[data.length - 1] : null;
-  return reply(200, { events, cursor: lastScanned ? { created_at: lastScanned.created_at, id: lastScanned.id } : null, server_time: new Date().toISOString() });
+  return reply(200, { events, cursor: lastScanned ? { created_at: lastScanned.created_at, id: lastScanned.id } : null, alert_config: alertConfig, server_time: new Date().toISOString() });
 });
