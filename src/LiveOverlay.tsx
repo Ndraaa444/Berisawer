@@ -23,14 +23,17 @@ export default function LiveOverlay() {
       return
     }
     let alive = true
-    let cursor = ''
+    let cursor: { created_at: string; id: string } | null = null
     let busy = false
     const poll = async () => {
       if (busy) return
       busy = true
       try {
         const params = new URLSearchParams({ token, feature })
-        if (cursor && feature !== 'leaderboard') params.set('after', cursor)
+        if (cursor && feature !== 'leaderboard') {
+          params.set('after', cursor.created_at)
+          params.set('after_id', cursor.id)
+        }
         const response = await fetch(supabaseUrl + '/functions/v1/overlay-feed?' + params.toString(), { headers: { apikey: anonKey } })
         const data = await response.json().catch(() => ({}))
         if (!response.ok) {
@@ -41,10 +44,10 @@ export default function LiveOverlay() {
           if (alive) setLeaders(Array.isArray(data.leaderboard) ? data.leaderboard as Leader[] : [])
         } else {
           const next = Array.isArray(data.events) ? data.events as OverlayEvent[] : []
-          if (next.length) {
-            cursor = next[next.length - 1].created_at
-            if (alive) setEvents(current => [...current, ...next].slice(-5))
+          if (data.cursor && typeof data.cursor.created_at === 'string' && typeof data.cursor.id === 'string') {
+            cursor = { created_at: data.cursor.created_at, id: data.cursor.id }
           }
+          if (next.length && alive) setEvents(current => [...current, ...next].slice(-5))
         }
         if (alive) setStatus('Terhubung • menunggu event')
       } catch {
