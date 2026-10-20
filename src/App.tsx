@@ -9,6 +9,7 @@ import {
 import { isSupabaseConfigured, supabase } from './lib/supabase'
 import LiveStudio from './LiveStudio'
 import LiveOverlay from './LiveOverlay'
+import PublicCreator from './PublicCreator'
 
 type Section = 'Overview' | 'Donations' | 'Overlay' | 'Live Studio' | 'Settings'
 const navigation: { label: Section; icon: typeof LayoutDashboard }[] = [
@@ -36,8 +37,12 @@ function Dashboard() {
   const [authMessage, setAuthMessage] = useState('')
   const [authBusy, setAuthBusy] = useState(false)
   const [userEmail, setUserEmail] = useState<string | null>(null)
+  const [userId, setUserId] = useState<string | null>(null)
   const [profileName, setProfileName] = useState('Creator')
-  const [handle, setHandle] = useState('creator-kamu')
+  const [handle, setHandle] = useState('creator_demo')
+  const [bio, setBio] = useState('')
+  const [profilePublic, setProfilePublic] = useState(true)
+  const [profileLoading, setProfileLoading] = useState(false)
   const [overlayTokens, setOverlayTokens] = useState<Record<string, string>>({})
   const [overlayBusy, setOverlayBusy] = useState(false)
   const [showUrls, setShowUrls] = useState<Record<string, boolean>>({})
@@ -46,11 +51,44 @@ function Dashboard() {
 
   useEffect(() => {
     if (!supabase) return
-    supabase.auth.getSession().then(({ data }) => setUserEmail(data.session?.user.email ?? null))
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+    let alive = true
+    const loadAccount = async (session: import('@supabase/supabase-js').Session | null) => {
+      if (!alive) return
       setUserEmail(session?.user.email ?? null)
-    })
-    return () => listener.subscription.unsubscribe()
+      setUserId(session?.user.id ?? null)
+      if (!session?.user) {
+        setProfileName('Creator')
+        setHandle('creator_demo')
+        setBio('')
+        return
+      }
+      setProfileLoading(true)
+      try {
+        const { data, error } = await supabase.from('creator_profiles')
+          .select('display_name,handle,bio,is_public')
+          .eq('id', session.user.id).maybeSingle()
+        if (error) throw error
+        if (data) {
+          if (alive) {
+            setProfileName(data.display_name)
+            setHandle(data.handle)
+            setBio(data.bio ?? '')
+            setProfilePublic(Boolean(data.is_public))
+          }
+        } else {
+          const base = (session.user.email?.split('@')[0] ?? 'creator').toLowerCase().replace(/[^a-z0-9_]/g, '_').replace(/^_+|_+$/g, '').slice(0, 20) || 'creator'
+          const suggested = `${base}_${session.user.id.replace(/-/g, '').slice(0, 6)}`.slice(0, 30)
+          const { error: insertError } = await supabase.from('creator_profiles').insert({ id: session.user.id, display_name: base.slice(0, 48) || 'Creator', handle: suggested, bio: '', is_public: true })
+          if (insertError) throw insertError
+          if (alive) { setProfileName(base.slice(0, 48) || 'Creator'); setHandle(suggested); setBio(''); setProfilePublic(true) }
+        }
+      } catch (error) {
+        if (alive) setAuthMessage('Profil akun belum bisa dimuat: ' + (error instanceof Error ? error.message : 'kesalahan tidak diketahui'))
+      } finally { if (alive) setProfileLoading(false) }
+    }
+    supabase.auth.getSession().then(({ data }) => { void loadAccount(data.session) })
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => { void loadAccount(session) })
+    return () => { alive = false; listener.subscription.unsubscribe() }
   }, [])
 
   useEffect(() => {
@@ -104,12 +142,16 @@ function Dashboard() {
     }
     setAuthBusy(true)
     setAuthMessage('')
-    const { error } = await supabase.auth.signInWithOtp({
-      email: email.trim(),
-      options: { emailRedirectTo: window.location.origin },
-    })
-    setAuthMessage(error ? error.message : 'Tautan masuk dikirim jika email ini diizinkan. Periksa kotak masuk Anda.')
-    setAuthBusy(false)
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        email: email.trim(),
+        options: { emailRedirectTo: window.location.origin },
+      })
+      if (error) throw error
+      setAuthMessage('Jika pendaftaran email diizinkan, tautan masuk/daftar sudah dikirim. Periksa Inbox dan folder Spam; tautan akan membuka workspace Berisawer.')
+    } catch (error) {
+      setAuthMessage('Gagal mengirim tautan: ' + (error instanceof Error ? error.message : 'periksa koneksi dan konfigurasi Supabase.'))
+    } finally { setAuthBusy(false) }
   }
 
   async function signOut() {
@@ -174,10 +216,24 @@ function Dashboard() {
     }
   }
 
-  function saveProfile(event: FormEvent<HTMLFormElement>) {
+  async function saveProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    setSaved(true)
-    window.setTimeout(() => setSaved(false), 2500)
+    if (!supabase || !userId) { setAuthMessage('Masuk ke akun terlebih dahulu untuk menyimpan profil ke database.'); return }
+    const cleanHandle = handle.trim().toLowerCase()
+    if (!/^[a-z0-9_]{3,30}$/.test(cleanHandle)) { setAuthMessage('Handle harus 3–30 karakter dan hanya memakai huruf kecil, angka, atau garis bawah.'); return }
+    setSaved(false)
+    setProfileLoading(true)
+    setAuthMessage('Menyimpan profil kreator…')
+    try {
+      const { error } = await supabase.from('creator_profiles').upsert({ id: userId, display_name: profileName.trim(), handle: cleanHandle, bio: bio.trim(), is_public: profilePublic, updated_at: new Date().toISOString() }, { onConflict: 'id' })
+      if (error) throw error
+      setHandle(cleanHandle)
+      setSaved(true)
+      setAuthMessage('Profil tersimpan permanen di Supabase.' + (profilePublic ? ` Halaman publik: ${window.location.origin}/creator/${cleanHandle}` : ' Profil saat ini disembunyikan dari publik.'))
+      window.setTimeout(() => setSaved(false), 2500)
+    } catch (error) {
+      setAuthMessage(error instanceof Error && /duplicate key|creator_profiles_handle_key/i.test(error.message) ? 'Handle sudah dipakai kreator lain. Pilih handle berbeda.' : 'Profil gagal disimpan: ' + (error instanceof Error ? error.message : 'periksa koneksi dan izin database.'))
+    } finally { setProfileLoading(false) }
   }
 
   return (
@@ -240,7 +296,7 @@ function Dashboard() {
           {section === 'Donations' && <Donations />}
           {section === 'Overlay' && <Overlay features={overlayFeatures} tokens={overlayTokens} busy={overlayBusy} copiedFeature={copiedFeature} showUrls={showUrls} urlFor={overlayUrl} onGenerate={generateOverlayTokens} onCopy={copyOverlay} onToggleUrl={feature => setShowUrls(current => ({ ...current, [feature]: !current[feature] }))} />}
           {section === 'Live Studio' && <LiveStudio />}
-          {section === 'Settings' && <SettingsPanel profileName={profileName} setProfileName={setProfileName} handle={handle} setHandle={setHandle} onSave={saveProfile} saved={saved} email={email} setEmail={setEmail} onLogin={sendMagicLink} authBusy={authBusy} userEmail={userEmail} />}
+          {section === 'Settings' && <SettingsPanel profileName={profileName} setProfileName={setProfileName} handle={handle} setHandle={setHandle} bio={bio} setBio={setBio} profilePublic={profilePublic} setProfilePublic={setProfilePublic} onSave={saveProfile} saved={saved} profileLoading={profileLoading} email={email} setEmail={setEmail} onLogin={sendMagicLink} authBusy={authBusy} userEmail={userEmail} />}
           <footer className="footer"><span>© 2026 Berisawer</span><span><span className="footer-dot" /> Sistem berjalan dalam mode preview</span></footer>
         </div>
       </main>
@@ -324,26 +380,29 @@ function Overlay({ features, tokens, busy, copiedFeature, showUrls, urlFor, onGe
   </>
 }
 
-function SettingsPanel({ profileName, setProfileName, handle, setHandle, onSave, saved, email, setEmail, onLogin, authBusy, userEmail }: {
-  profileName: string; setProfileName: (value: string) => void; handle: string; setHandle: (value: string) => void; onSave: (event: FormEvent<HTMLFormElement>) => void; saved: boolean; email: string; setEmail: (value: string) => void; onLogin: (event: FormEvent<HTMLFormElement>) => void; authBusy: boolean; userEmail: string | null
+function SettingsPanel({ profileName, setProfileName, handle, setHandle, bio, setBio, profilePublic, setProfilePublic, onSave, saved, profileLoading, email, setEmail, onLogin, authBusy, userEmail }: {
+  profileName: string; setProfileName: (value: string) => void; handle: string; setHandle: (value: string) => void; bio: string; setBio: (value: string) => void; profilePublic: boolean; setProfilePublic: (value: boolean) => void; onSave: (event: FormEvent<HTMLFormElement>) => void; saved: boolean; profileLoading: boolean; email: string; setEmail: (value: string) => void; onLogin: (event: FormEvent<HTMLFormElement>) => void; authBusy: boolean; userEmail: string | null
 }) {
   return <>
     <PageHeading eyebrow="WORKSPACE CONFIGURATION" title="Pengaturan" description="Kelola profil creator dan sambungkan autentikasi Supabase." />
-    <div className="settings-grid"><section className="panel settings-panel"><div className="panel-heading"><div><h2>Profil creator</h2><p>Pratinjau profil lokal pada sesi ini</p></div><div className="settings-icon"><Settings size={18} /></div></div>
+    <div className="settings-grid"><section className="panel settings-panel"><div className="panel-heading"><div><h2>Profil kreator</h2><p>{userEmail ? 'Disimpan permanen ke Supabase' : 'Masuk untuk membuat dan menyimpan profil'}</p></div><div className="settings-icon"><Settings size={18} /></div></div>
       <form onSubmit={onSave}><label className="field-label" htmlFor="creator-name">NAMA TAMPILAN</label><input id="creator-name" className="form-input" maxLength={48} value={profileName} onChange={e => setProfileName(e.target.value)} required />
-      <label className="field-label" htmlFor="creator-handle">HANDLE PUBLIK</label><div className="handle-input"><span>@</span><input id="creator-handle" maxLength={24} pattern="[a-zA-Z0-9_-]+" value={handle} onChange={e => setHandle(e.target.value.toLowerCase())} required /></div><p className="field-help">Gunakan huruf, angka, garis bawah, atau tanda hubung.</p>
-      <div className="form-footer"><span className="helper-text">Belum disimpan ke database.</span><button className="button button-primary" type="submit">{saved ? <Check size={15} /> : null}{saved ? 'Tersimpan di sesi' : 'Simpan profil'}</button></div></form>
+      <label className="field-label" htmlFor="creator-handle">HANDLE PUBLIK</label><div className="handle-input"><span>@</span><input id="creator-handle" maxLength={30} pattern="[a-z0-9_]{3,30}" value={handle} onChange={e => setHandle(e.target.value.toLowerCase())} required /></div><p className="field-help">3–30 karakter: huruf kecil, angka, dan garis bawah. Handle harus unik.</p>
+      <label className="field-label" htmlFor="creator-bio">BIOGRAFI (OPSIONAL)</label><textarea id="creator-bio" className="form-input" maxLength={500} rows={3} value={bio} onChange={e => setBio(e.target.value)} placeholder="Ceritakan tentang channel kamu…" />
+      <label className="field-help" style={{display:'flex',alignItems:'center',gap:8,marginTop:12}}><input type="checkbox" checked={profilePublic} onChange={e => setProfilePublic(e.target.checked)} /> Tampilkan halaman kreator ke publik</label>
+      <div className="form-footer"><span className="helper-text">{userEmail ? (profilePublic ? `Publik: /creator/${handle || 'handle'}` : 'Profil privat') : 'Login diperlukan untuk menyimpan.'}</span><button className="button button-primary" type="submit" disabled={!userEmail || profileLoading}>{profileLoading ? 'Menyimpan…' : saved ? <Check size={15} /> : null}{saved ? 'Tersimpan' : 'Simpan profil'}</button></div></form>
     </section>
     <section className="panel settings-panel"><div className="panel-heading"><div><h2>Akun & autentikasi</h2><p>{isSupabaseConfigured ? 'Supabase client terkonfigurasi' : 'Menunggu konfigurasi environment'}</p></div><div className="settings-icon"><ShieldCheck size={18} /></div></div>
       <div className="config-status"><span className={`config-dot ${isSupabaseConfigured ? 'configured' : ''}`} /><span><strong>{isSupabaseConfigured ? 'Supabase tersedia' : 'Supabase belum terkonfigurasi'}</strong><small>{userEmail ? `Masuk sebagai ${userEmail}` : 'Gunakan email untuk menerima tautan masuk.'}</small></span></div>
       {!userEmail && <form onSubmit={onLogin}><label className="field-label" htmlFor="login-email">EMAIL</label><input id="login-email" className="form-input" type="email" autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="nama@email.com" required /><button className="button button-primary full-button" type="submit" disabled={authBusy}>{authBusy ? 'Mengirim tautan...' : 'Kirim magic link'}</button></form>}
       <div className="info-card compact"><ShieldCheck size={18} /><p>Frontend memakai public anon key saja. Pastikan RLS aktif pada tabel pengguna dan jangan pernah menaruh service-role key di sini.</p></div>
     </section></div>
-    <section className="panel payment-panel"><div className="payment-lock"><ShieldCheck size={20} /></div><div><h2>Integrasi pembayaran</h2><p>QRIS, Midtrans, dan gateway lain tetap nonaktif sampai verifikasi merchant selesai dan pengujian webhook disetujui.</p></div><span className="notice-badge">DINONAKTIFKAN</span></section>
+    <section className="panel payment-panel"><div className="payment-lock"><ShieldCheck size={20} /></div><div><h2>Integrasi pembayaran</h2><p>QRIS, Midtrans, dan gateway lain tetap nonaktif sampai verifikasi merchant selesai dan pengujian webhook disetujui. Halaman publik saat ini hanya profil kreator; belum menerima atau mencatat pembayaran.</p></div><span className="notice-badge">DINONAKTIFKAN</span></section>
   </>
 }
 
 export default function App() {
   if (typeof window !== 'undefined' && window.location.pathname === '/overlay') return <LiveOverlay />
+  if (typeof window !== 'undefined' && window.location.pathname.startsWith('/creator/')) return <PublicCreator />
   return <Dashboard />
 }
