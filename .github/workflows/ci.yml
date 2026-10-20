@@ -1,0 +1,54 @@
+name: Berisawer CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Typecheck and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install dependencies
+        run: npm install
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Build production assets
+        run: npm run build
+
+  deploy-pages:
+    name: Deploy to Cloudflare Pages (opt-in)
+    needs: verify
+    if: ${{ vars.CLOUDFLARE_PAGES_ENABLED == 'true' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install dependencies
+        run: npm install
+      - name: Build production assets
+        run: npm run build
+      - name: Deploy to Cloudflare Pages
+        run: npx wrangler pages deploy dist --project-name=berisawer --branch=main
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
