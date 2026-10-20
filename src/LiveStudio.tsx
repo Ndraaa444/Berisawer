@@ -138,10 +138,10 @@ export default function LiveStudio() {
 
   return <div className="live-studio">
     <div className="page-heading"><div><div className="eyebrow">STREAMER TOOLKIT</div><h1>Live Studio</h1><p>Kelola interaksi livestream, overlay, antrean, dan aktivitas komunitas dari satu tempat.</p></div><div className="heading-action"><span className="live-preview-pill"><span /> PREVIEW MODE</span></div></div>
-    <div className="live-safety-banner"><ShieldCheck size={20} /><div><strong>Mode aman aktif — fitur ini masih preview</strong><p>Tombol dan perubahan di halaman ini belum menjalankan TTS, memutar media, mengubah timer live, atau menyimpan konfigurasi ke database. Pembayaran tetap nonaktif.</p></div></div>
+    <div className="live-safety-banner"><ShieldCheck size={20} /><div><strong>Mode aman aktif — pembayaran tetap nonaktif</strong><p>Sudah terhubung: profil akun, token overlay, alert demo, Running Text, pengaturan suara/TTS, filter moderasi, dan penyimpanan switch. Masih preview: timer subathon, target komunitas, polling, antrean request, dan media share; belum terhubung ke chat YouTube/Twitch atau donasi nyata.</p></div></div>
     {message && <div className="live-feedback" role="status"><Check size={16} />{message}<button onClick={() => setMessage('')} aria-label="Tutup pesan">×</button></div>}
     <div className="live-stats-grid">
-      <div className="live-stat"><span>Tools aktif</span><strong>{enabledCount}<small> / {tools.length}</small></strong><span className="live-stat-foot">Konfigurasi preview</span></div>
+      <div className="live-stat"><span>Tools aktif</span><strong>{enabledCount}<small> / {tools.length}</small></strong><span className="live-stat-foot">{userId ? 'Disimpan di akun' : 'Konfigurasi preview'}</span></div>
       <div className="live-stat"><span>Antrean interaksi</span><strong>{queue.length}</strong><span className="live-stat-foot">Item simulasi</span></div>
       <div className="live-stat"><span>Target komunitas</span><strong>{goalPercent}%</strong><span className="live-stat-foot">{new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',maximumFractionDigits:0}).format(goalCurrent)} terkumpul (contoh)</span></div>
     </div>
@@ -150,7 +150,7 @@ export default function LiveStudio() {
     <div className="live-tool-grid">{tools.map(tool => { const Icon = tool.icon; return <article className={`live-tool-card ${tool.enabled ? 'tool-enabled' : ''}`} key={tool.key}>
       <div className="live-tool-top"><span className="live-tool-icon"><Icon size={20} /></span><span className="live-tool-tag">{tool.tag}</span></div>
       <div className="live-tool-copy"><h3>{tool.title}</h3><p>{tool.description}</p></div>
-      <div className="live-tool-bottom"><span className={tool.enabled ? 'tool-state state-on' : 'tool-state'}>{tool.enabled ? 'Aktif di preview' : 'Nonaktif'}</span><button className={`live-toggle ${tool.enabled ? 'toggle-on' : ''}`} onClick={() => toggleTool(tool.key)} aria-label={`${tool.enabled ? 'Nonaktifkan' : 'Aktifkan'} ${tool.title}`}>{tool.enabled ? <ToggleRight size={28} /> : <ToggleLeft size={28} />}</button></div>
+      <div className="live-tool-bottom"><span className={tool.enabled ? 'tool-state state-on' : 'tool-state'}>{tool.enabled ? (userId ? 'Aktif • akun tersimpan' : 'Aktif di preview') : 'Nonaktif'}</span><button className={`live-toggle ${tool.enabled ? 'toggle-on' : ''}`} onClick={() => toggleTool(tool.key)} aria-label={`${tool.enabled ? 'Nonaktifkan' : 'Aktifkan'} ${tool.title}`}>{tool.enabled ? <ToggleRight size={28} /> : <ToggleLeft size={28} />}</button></div>
     </article> })}</div>
     <div className="live-config-grid">
       <section className="panel live-config-panel"><div className="panel-heading"><div><h2><MessageSquareText size={17} /> Running Text</h2><p>Konten teks untuk browser overlay</p></div><span className="live-mini-status">LOCAL</span></div>
