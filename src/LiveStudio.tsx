@@ -5,6 +5,8 @@ import {
   Trash2, Trophy, Volume2, Zap,
 } from 'lucide-react'
 import './live-studio.css'
+import LiveToolPricing from './LiveToolPricing'
+import ContentModeration from './ContentModeration'
 
 type ToolKey = 'voice' | 'media' | 'ticker' | 'subathon' | 'alerts' | 'goals' | 'polls' | 'redeems'
 
@@ -114,6 +116,8 @@ export default function LiveStudio() {
       <div className="live-poll-options"><div><label className="field-label" htmlFor="poll-a">PILIHAN A</label><input id="poll-a" className="form-input" value={pollA} onChange={e => setPollA(e.target.value)} maxLength={60} /></div><div><label className="field-label" htmlFor="poll-b">PILIHAN B</label><input id="poll-b" className="form-input" value={pollB} onChange={e => setPollB(e.target.value)} maxLength={60} /></div></div>
       <div className="live-poll-preview"><span>POLL PREVIEW</span><strong>{pollTitle || 'Pertanyaan polling'}</strong><div><span>{pollA || 'Pilihan A'}</span><span>{pollB || 'Pilihan B'}</span></div><small>Voting belum tersambung ke chat atau database.</small></div>
     </section>
+    <LiveToolPricing />
+    <ContentModeration />
     <div className="live-roadmap"><Sparkles size={19} /><div><strong>Integrasi berikutnya</strong><p>Supabase realtime untuk event, autentikasi overlay token, TTS provider, media moderation, chat platform, OBS browser source, serta timer subathon yang hanya berubah dari event terverifikasi.</p></div></div>
   </div>
 }
