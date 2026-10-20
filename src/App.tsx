@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import {
-  Activity, ArrowDownRight, ArrowUpRight, Bell, Check, ChevronDown,
-  CircleDollarSign, Copy, ExternalLink, Eye, EyeOff, Gauge, Heart,
+  Activity, ArrowUpRight, Bell, Check, ChevronDown,
+  CircleDollarSign, Copy, Eye, EyeOff, Heart,
   LayoutDashboard, Link2, LogOut, Menu, MonitorPlay, Radio, Settings,
   ShieldCheck, Sparkles, Wallet, X,
 } from 'lucide-react'
