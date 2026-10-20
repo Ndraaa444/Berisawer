@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 
 type OverlayEvent = { id: string; event_type: string; payload: Record<string, unknown>; created_at: string }
 type Leader = { name: string; amount: number; donations: number }
+type AlertConfig = { volume?: number; tts_enabled?: boolean; read_donor_message?: boolean; language?: string; voice_name?: string; template?: string; sound_url?: string; sound_pack?: string }
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim()
 const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim()
 const money = (value: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(value)
@@ -12,6 +13,7 @@ export default function LiveOverlay() {
   const [status, setStatus] = useState('Menghubungkan overlay…')
   const [token] = useState(() => new URLSearchParams(window.location.search).get('token') ?? '')
   const [feature] = useState(() => new URLSearchParams(window.location.search).get('feature') ?? 'all')
+  const [alertConfig, setAlertConfig] = useState<AlertConfig>({ volume: 65, tts_enabled: true, read_donor_message: true, language: 'id-ID', sound_pack: 'shine' })
 
   useEffect(() => {
     if (!token || token === 'TOKEN_BELUM_DIBUAT' || token === 'SET_OVERLAY_TOKEN') {
@@ -25,6 +27,37 @@ export default function LiveOverlay() {
     let alive = true
     let cursor: { created_at: string; id: string } | null = null
     let busy = false
+    let firstResponse = true
+    const spokenIds = new Set<string>()
+    const playShine = (volume: number) => {
+      try {
+        const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+        if (!AudioContextClass) return
+        const ctx = new AudioContextClass(); const master = ctx.createGain(); master.gain.value = Math.max(0, Math.min(1, volume / 100)) * 0.42; master.connect(ctx.destination)
+        const now = ctx.currentTime
+        ;[{ f: 1318.51, at: 0, dur: 0.52 }, { f: 1760, at: 0.085, dur: 0.62 }, { f: 2349.32, at: 0.17, dur: 0.78 }].forEach(({ f, at, dur }) => { const osc = ctx.createOscillator(); const env = ctx.createGain(); osc.type = 'sine'; osc.frequency.setValueAtTime(f, now + at); env.gain.setValueAtTime(0.0001, now + at); env.gain.exponentialRampToValueAtTime(0.22, now + at + 0.018); env.gain.exponentialRampToValueAtTime(0.0001, now + at + dur); osc.connect(env); env.connect(master); osc.start(now + at); osc.stop(now + at + dur + 0.02) })
+        window.setTimeout(() => { void ctx.close() }, 1300)
+      } catch { /* Browser audio is optional. */ }
+    }
+    const playAlert = (event: OverlayEvent, config: AlertConfig) => {
+      if (spokenIds.has(event.id)) return
+      spokenIds.add(event.id)
+      if (spokenIds.size > 100) spokenIds.delete(spokenIds.values().next().value as string)
+      const volume = Math.max(0, Math.min(100, Number(config.volume ?? 65)))
+      if (config.sound_pack === 'shine' || !config.sound_pack) playShine(volume)
+      else if (config.sound_url) { const audio = new Audio(config.sound_url); audio.volume = volume / 100; void audio.play().catch(() => {}) }
+      if (config.tts_enabled === false || !('speechSynthesis' in window)) return
+      const p = event.payload ?? {}
+      const donor = String(p.donor_name ?? p.name ?? 'Supporter').slice(0, 80)
+      const amount = Number(p.amount ?? 0)
+      const message = config.read_donor_message === false ? '' : String(p.message ?? p.text ?? '').slice(0, 240)
+      const template = String(config.template || '{donor_name} mengirim {amount}. Pesan: {message}')
+      const spoken = template.replaceAll('{donor_name}', donor).replaceAll('{amount}', amount > 0 ? money(amount) : 'dukungan demo').replaceAll('{message}', message)
+      const utterance = new SpeechSynthesisUtterance(spoken.slice(0, 400)); utterance.lang = config.language || 'id-ID'; utterance.volume = volume / 100
+      const voices = window.speechSynthesis.getVoices(); const chosen = voices.find(v => v.name === config.voice_name) || voices.find(v => /google/i.test(v.name) && v.lang.toLowerCase().startsWith(utterance.lang.slice(0,2))) || voices.find(v => v.lang.toLowerCase().startsWith(utterance.lang.slice(0,2)))
+      if (chosen) utterance.voice = chosen
+      window.speechSynthesis.speak(utterance)
+    }
     const poll = async () => {
       if (busy) return
       busy = true
@@ -40,6 +73,7 @@ export default function LiveOverlay() {
           if (alive) setStatus(response.status === 401 ? 'Token tidak valid atau sudah dicabut.' : response.status === 403 ? 'URL ini hanya berlaku untuk fitur yang dipilih saat token dibuat.' : 'Overlay belum dapat mengambil event.')
           return
         }
+        if (data.alert_config && typeof data.alert_config === 'object' && alive) setAlertConfig(data.alert_config as AlertConfig)
         if (feature === 'leaderboard') {
           if (alive) setLeaders(Array.isArray(data.leaderboard) ? data.leaderboard as Leader[] : [])
         } else {
@@ -47,7 +81,13 @@ export default function LiveOverlay() {
           if (data.cursor && typeof data.cursor.created_at === 'string' && typeof data.cursor.id === 'string') {
             cursor = { created_at: data.cursor.created_at, id: data.cursor.id }
           }
-          if (next.length && alive) setEvents(current => [...current, ...next].slice(-5))
+          if (next.length && alive) {
+            if (!firstResponse && (feature === 'alerts' || feature === 'voice' || feature === 'all')) {
+              next.filter(event => ['alert', 'donation', 'supporter', 'voice'].includes(event.event_type)).forEach(event => playAlert(event, data.alert_config && typeof data.alert_config === 'object' ? data.alert_config as AlertConfig : alertConfig))
+            }
+            setEvents(current => [...current, ...next].slice(-5))
+          }
+          firstResponse = false
         }
         if (alive) setStatus('Terhubung • menunggu event')
       } catch {
