@@ -44,7 +44,7 @@ Deno.serve(async (req: Request) => {
   if (!url || !key) return reply(503, { error: "server_not_configured" });
   const admin = createClient(url, key, { auth: { persistSession: false } });
   const tokenHash = await sha256(token);
-  const { data: overlay, error: tokenError } = await admin.from("overlay_tokens").select("id,creator_id").eq("token_hash", tokenHash).is("revoked_at", null).maybeSingle();
+  const { data: overlay, error: tokenError } = await admin.from("overlay_tokens").select("id,creator_id,label").eq("token_hash", tokenHash).is("revoked_at", null).maybeSingle();
   if (tokenError || !overlay) return reply(401, { error: "invalid_overlay_token" });
   const { data: settings } = await admin.from("creator_settings").select("live_tools_config").eq("user_id", overlay.creator_id).maybeSingle();
   const moderation = settings?.live_tools_config?.moderation;
@@ -52,8 +52,43 @@ Deno.serve(async (req: Request) => {
     ? moderation.rules.filter((r: any) => r && typeof r.phrase === "string" && ["reject", "mask", "hide"].includes(r.action)).slice(0, 200)
     : [];
   const params = new URL(req.url).searchParams;
+  const requestedFeature = params.get("feature") ?? "all";
+  const tokenFeature = typeof overlay.label === "string" && overlay.label.startsWith("overlay:")
+    ? overlay.label.slice("overlay:".length)
+    : "all";
+  if (requestedFeature !== tokenFeature) return reply(403, { error: "overlay_feature_mismatch" });
+
+  if (requestedFeature === "leaderboard") {
+    const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const { data: donationEvents, error: leaderboardError } = await admin.from("overlay_events")
+      .select("payload,created_at").eq("creator_id", overlay.creator_id).eq("event_type", "donation")
+      .gte("created_at", since).order("created_at", { ascending: false }).limit(2000);
+    if (leaderboardError) return reply(500, { error: "leaderboard_unavailable" });
+    const totals = new Map<string, { name: string; amount: number; donations: number }>();
+    for (const event of donationEvents ?? []) {
+      const payload = event.payload && typeof event.payload === "object" && !Array.isArray(event.payload) ? event.payload as Record<string, unknown> : {};
+      if (payload.verified !== true && payload.status !== "verified") continue;
+      if (payload.is_anonymous === true || payload.anonymous === true) continue;
+      const rawName = payload.donor_name ?? payload.name;
+      const amount = Number(payload.amount);
+      if (typeof rawName !== "string" || !rawName.trim() || !Number.isFinite(amount) || amount <= 0) continue;
+      const name = rawName.trim().slice(0, 64);
+      const current = totals.get(name) ?? { name, amount: 0, donations: 0 };
+      current.amount += amount; current.donations += 1; totals.set(name, current);
+    }
+    const leaderboard = [...totals.values()].sort((a, b) => b.amount - a.amount).slice(0, 10);
+    await admin.from("overlay_tokens").update({ last_used_at: new Date().toISOString() }).eq("id", overlay.id);
+    return reply(200, { leaderboard, period_days: 30, server_time: new Date().toISOString() });
+  }
+
   const after = params.get("after");
-  let query = admin.from("overlay_events").select("id,event_type,payload,created_at").eq("creator_id", overlay.creator_id).order("created_at", { ascending: true }).limit(25);
+  const eventTypes: Record<string, string[]> = {
+    all: ["ticker", "donation", "alert", "voice", "media", "subathon", "goal", "poll", "request", "supporter"],
+    alerts: ["donation", "alert", "supporter", "goal"], ticker: ["ticker"], voice: ["voice", "donation"],
+    media: ["media"], subathon: ["subathon"], goals: ["goal"], polls: ["poll"], requests: ["request"],
+  };
+  if (!eventTypes[requestedFeature]) return reply(400, { error: "unsupported_overlay_feature" });
+  let query = admin.from("overlay_events").select("id,event_type,payload,created_at").eq("creator_id", overlay.creator_id).in("event_type", eventTypes[requestedFeature]).order("created_at", { ascending: true }).limit(25);
   if (after) query = query.gt("created_at", after);
   const { data, error } = await query;
   if (error) return reply(500, { error: "feed_unavailable" });
