@@ -1,15 +1,50 @@
 # Berisawer
 
-Futuristic creator tipping dashboard and browser overlay.
+Futuristic creator tipping dashboard and browser overlay, built with React, TypeScript, Vite, and an optional Supabase browser client.
 
-> QRIS and payment gateway integrations remain disabled until merchant verification is complete.
+## Current scope
 
-## Development
+- Responsive creator console with overview, donation preview, overlay setup, and profile settings.
+- Supabase magic-link sign-in when public Supabase environment values are configured.
+- TypeScript strict checks and production build in GitHub Actions.
+- Cloudflare Pages deployment workflow is opt-in and will run only when repository variable `CLOUDFLARE_PAGES_ENABLED=true` is set on `main`.
 
-- Node.js 20+
-- `npm install`
-- Copy `.env.example` to `.env.local` and configure Supabase public URL and anon key.
-- `npm run dev`
-- `npm run build`
+> **Payments are intentionally disabled.** QRIS and payment gateway integration must remain off until merchant verification and end-to-end webhook testing are complete. Dashboard activity and metrics shown before live backend integration are sample data only. Overlay URL shown in the UI is a placeholder, not a working token.
 
-Never put the Supabase service-role key or payment gateway secret in frontend environment variables.
+## Local development
+
+Requirements: Node.js 20 or newer.
+
+```sh
+npm install
+cp .env.example .env.local
+npm run dev
+```
+
+Set these public browser values in `.env.local`:
+
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY` (or the Supabase publishable key supported by your project)
+
+Run checks before shipping:
+
+```sh
+npm run typecheck
+npm run build
+```
+
+## Cloudflare Pages
+
+Project name: `berisawer`  
+Build command: `npm run build`  
+Build output directory: `dist`  
+Production branch: `main`
+
+For GitHub Actions deployment, configure repository secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`, then set repository variable `CLOUDFLARE_PAGES_ENABLED` to `true`. The token needs Pages deployment permissions. Do not put secrets in `VITE_*` variables because they are bundled into browser code.
+
+## Security notes
+
+- Never expose a Supabase service-role key or payment gateway server key in frontend code or `VITE_*` variables.
+- Keep Row Level Security enabled and verify ownership policies on every user-facing table.
+- Only treat payments as successful after validating the payment provider's server-side webhook signature and amount.
+- Generate, store, rotate, and revoke overlay tokens server-side; never use a hard-coded placeholder as a production token.
