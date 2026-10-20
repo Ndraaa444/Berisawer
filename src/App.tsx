@@ -136,7 +136,7 @@ function Dashboard() {
     { key: 'requests', title: 'Request & Challenge', description: 'Antrean request komunitas' },
     { key: 'leaderboard', title: 'Leaderboard', description: 'Peringkat supporter berdasarkan donasi terverifikasi' },
   ]
-  const overlayUrl = (feature: string) => typeof window === 'undefined' ? 'https://your-domain.example/overlay' : window.location.origin + '/overlay?token=' + (overlayTokens[feature] || 'TOKEN_BELUM_DIBUAT') + '&feature=' + feature
+  const overlayUrl = (feature: string) => typeof window === 'undefined' ? 'https://bagisawer.my.id/overlay' : window.location.origin + '/overlay?token=' + (overlayTokens[feature] || 'TOKEN_BELUM_DIBUAT') + '&feature=' + feature
 
   async function sendMagicLink(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -321,7 +321,7 @@ function Dashboard() {
           {section === 'Overlay' && <Overlay features={overlayFeatures} tokens={overlayTokens} busy={overlayBusy} copiedFeature={copiedFeature} showUrls={showUrls} urlFor={overlayUrl} onGenerate={generateOverlayTokens} onCopy={copyOverlay} onToggleUrl={feature => setShowUrls(current => ({ ...current, [feature]: !current[feature] }))} />}
           {section === 'Live Studio' && <LiveStudio />}
           {section === 'Settings' && <SettingsPanel profileName={profileName} setProfileName={setProfileName} handle={handle} setHandle={setHandle} bio={bio} setBio={setBio} profilePublic={profilePublic} setProfilePublic={setProfilePublic} onSave={saveProfile} saved={saved} profileLoading={profileLoading} email={email} setEmail={setEmail} otp={otp} setOtp={setOtp} otpSent={otpSent} onLogin={sendMagicLink} onVerifyOtp={verifyEmailOtp} authBusy={authBusy} userEmail={userEmail} />}
-          <footer className="footer"><span>© 2026 Berisawer</span><span><span className="footer-dot" /> Sistem berjalan dalam mode preview</span></footer>
+          <footer className="footer"><span>© 2026 Bagisawer</span><span><span className="footer-dot" /> Sistem berjalan dalam mode preview</span></footer>
         </div>
       </main>
     </div>
