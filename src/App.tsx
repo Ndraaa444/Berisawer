@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { isSupabaseConfigured, supabase } from './lib/supabase'
 import LiveStudio from './LiveStudio'
+import LiveOverlay from './LiveOverlay'
 
 type Section = 'Overview' | 'Donations' | 'Overlay' | 'Live Studio' | 'Settings'
 const navigation: { label: Section; icon: typeof LayoutDashboard }[] = [
@@ -28,7 +29,7 @@ function formatMoney(value: number) {
   return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(value)
 }
 
-function App() {
+function Dashboard() {
   const [section, setSection] = useState<Section>('Overview')
   const [menuOpen, setMenuOpen] = useState(false)
   const [email, setEmail] = useState('')
@@ -39,6 +40,8 @@ function App() {
   const [handle, setHandle] = useState('creator-kamu')
   const [copied, setCopied] = useState(false)
   const [showUrl, setShowUrl] = useState(false)
+  const [overlayToken, setOverlayToken] = useState('')
+  const [overlayBusy, setOverlayBusy] = useState(false)
   const [saved, setSaved] = useState(false)
 
   useEffect(() => {
@@ -52,8 +55,8 @@ function App() {
 
   const overlayUrl = useMemo(() => {
     if (typeof window === 'undefined') return 'https://your-domain.example/overlay'
-    return window.location.origin + '/overlay?token=SET_OVERLAY_TOKEN'
-  }, [])
+    return window.location.origin + '/overlay?token=' + (overlayToken || 'SET_OVERLAY_TOKEN')
+  }, [overlayToken])
 
   async function sendMagicLink(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -75,6 +78,27 @@ function App() {
     if (supabase) await supabase.auth.signOut()
     setUserEmail(null)
     setAuthMessage('')
+  }
+
+  async function generateOverlayToken() {
+    if (!supabase) { setAuthMessage('Supabase belum dikonfigurasi.'); return }
+    setOverlayBusy(true)
+    setAuthMessage('')
+    try {
+      const { data: auth, error: authError } = await supabase.auth.getUser()
+      if (authError || !auth.user) throw new Error('Masuk ke akun kreator terlebih dahulu.')
+      const bytes = crypto.getRandomValues(new Uint8Array(32))
+      const token = Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('')
+      const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token))
+      const tokenHash = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('')
+      const { error } = await supabase.from('overlay_tokens').insert({ creator_id: auth.user.id, token_hash: tokenHash, label: 'OBS Browser Overlay' })
+      if (error) throw error
+      setOverlayToken(token)
+      setShowUrl(true)
+      setAuthMessage('Token overlay dibuat. Salin URL sekarang; token mentah hanya tersedia di sesi ini.')
+    } catch (error) {
+      setAuthMessage(error instanceof Error ? error.message : 'Token overlay gagal dibuat. Periksa login dan izin RLS.')
+    } finally { setOverlayBusy(false) }
   }
 
   async function copyOverlay() {
@@ -152,7 +176,7 @@ function App() {
 
           {section === 'Overview' && <Overview onNavigate={setSection} />}
           {section === 'Donations' && <Donations />}
-          {section === 'Overlay' && <Overlay url={overlayUrl} copied={copied} showUrl={showUrl} onCopy={copyOverlay} onToggleUrl={() => setShowUrl(!showUrl)} />}
+          {section === 'Overlay' && <Overlay url={overlayUrl} copied={copied} showUrl={showUrl} tokenExists={Boolean(overlayToken)} busy={overlayBusy} onGenerate={generateOverlayToken} onCopy={copyOverlay} onToggleUrl={() => setShowUrl(!showUrl)} />}
           {section === 'Live Studio' && <LiveStudio />}
           {section === 'Settings' && <SettingsPanel profileName={profileName} setProfileName={setProfileName} handle={handle} setHandle={setHandle} onSave={saveProfile} saved={saved} email={email} setEmail={setEmail} onLogin={sendMagicLink} authBusy={authBusy} userEmail={userEmail} />}
           <footer className="footer"><span>© 2026 Berisawer</span><span><span className="footer-dot" /> Sistem berjalan dalam mode preview</span></footer>
@@ -209,16 +233,16 @@ function Donations() {
   </>
 }
 
-function Overlay({ url, copied, showUrl, onCopy, onToggleUrl }: { url: string; copied: boolean; showUrl: boolean; onCopy: () => void; onToggleUrl: () => void }) {
+function Overlay({ url, copied, showUrl, tokenExists, busy, onGenerate, onCopy, onToggleUrl }: { url: string; copied: boolean; showUrl: boolean; tokenExists: boolean; busy: boolean; onGenerate: () => void; onCopy: () => void; onToggleUrl: () => void }) {
   return <>
     <PageHeading eyebrow="STREAMING TOOLS" title="Browser overlay" description="Siapkan overlay untuk OBS atau software streaming lain." action={<span className="status-tag status-muted">BELUM AKTIF</span>} />
-    <div className="overlay-layout"><section className="panel overlay-config"><div className="panel-heading"><div><h2>Konfigurasi overlay</h2><p>URL ini hanya template preview, bukan token aktif.</p></div><div className="overlay-icon"><MonitorPlay size={19} /></div></div>
+    <div className="overlay-layout"><section className="panel overlay-config"><div className="panel-heading"><div><h2>Konfigurasi overlay</h2><p>Buat token aman untuk menghubungkan Browser Source ke event kreator.</p></div><div className="overlay-icon"><MonitorPlay size={19} /></div></div>
       <label className="field-label">URL BROWSER SOURCE</label><div className="url-field"><Link2 size={16} /><input readOnly type={showUrl ? 'text' : 'password'} value={url} aria-label="URL overlay preview" /><button className="icon-button" onClick={onToggleUrl} aria-label={showUrl ? 'Sembunyikan URL' : 'Tampilkan URL'}>{showUrl ? <EyeOff size={16} /> : <Eye size={16} />}</button></div>
-      <div className="url-actions"><button className="button button-primary" onClick={onCopy}>{copied ? <Check size={15} /> : <Copy size={15} />}{copied ? 'Tersalin' : 'Salin URL'}</button><span className="helper-text">Token autentik belum diterbitkan.</span></div>
+      <div className="url-actions"><button className="button button-primary" onClick={onGenerate} disabled={busy}>{busy ? 'Membuat token…' : tokenExists ? 'Buat token baru' : 'Buat token overlay'}</button><button className="button button-secondary" onClick={onCopy} disabled={!tokenExists}>{copied ? <Check size={15} /> : <Copy size={15} />}{copied ? 'Tersalin' : 'Salin URL'}</button></div><span className="helper-text">{tokenExists ? 'Token disimpan sebagai hash. Salin URL sekarang; token mentah tidak bisa dipulihkan.' : 'Login diperlukan untuk membuat token overlay.'}</span>
       <div className="divider-line" /><h3>Rekomendasi OBS</h3><div className="obs-settings"><div><span>Lebar</span><strong>1920 px</strong></div><div><span>Tinggi</span><strong>1080 px</strong></div><div><span>FPS</span><strong>30</strong></div></div>
-      <div className="info-card compact"><ShieldCheck size={18} /><p>Jangan gunakan URL contoh ini sebagai Browser Source produksi. Token overlay perlu dibuat dan disimpan dengan aman terlebih dahulu.</p></div>
+      <div className="info-card compact"><ShieldCheck size={18} /><p>Token disimpan di database sebagai hash. Buat token baru jika hilang dan cabut token lama sebelum membagikan URL baru.</p></div>
     </section>
-    <section className="overlay-preview"><div className="preview-top"><span><span className="preview-live-dot" /> PREVIEW CANVAS</span><span>16:9</span></div><div className="preview-canvas"><div className="preview-grid" /><div className="preview-empty"><div className="preview-symbol"><Radio size={28} /></div><strong>Overlay kamu akan muncul di sini</strong><span>Hubungkan token untuk melihat event sawer secara real-time.</span><span className="preview-pill">PREVIEW ONLY</span></div><div className="preview-bottom"><span>BERISAWER / OVERLAY</span><span>WAITING FOR EVENT</span></div></div><p className="preview-caption"><Activity size={14} /> Tampilan ilustrasi; koneksi live belum diaktifkan.</p></section></div>
+    <section className="overlay-preview"><div className="preview-top"><span><span className="preview-live-dot" /> PREVIEW CANVAS</span><span>16:9</span></div><div className="preview-canvas"><div className="preview-grid" /><div className="preview-empty"><div className="preview-symbol"><Radio size={28} /></div><strong>Overlay Browser Source</strong><span>Halaman /overlay menampilkan running text yang dikirim ke antrean.</span><span className="preview-pill">{tokenExists ? 'TOKEN AKTIF' : 'BUAT TOKEN DULU'}</span></div><div className="preview-bottom"><span>BERISAWER / OVERLAY</span><span>WAITING FOR EVENT</span></div></div><p className="preview-caption"><Activity size={14} /> Tampilan ilustrasi; koneksi live belum diaktifkan.</p></section></div>
   </>
 }
 
@@ -241,4 +265,7 @@ function SettingsPanel({ profileName, setProfileName, handle, setHandle, onSave,
   </>
 }
 
-export default App
+export default function App() {
+  if (typeof window !== 'undefined' && window.location.pathname === '/overlay') return <LiveOverlay />
+  return <Dashboard />
+}
