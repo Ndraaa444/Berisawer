@@ -279,6 +279,7 @@ function Dashboard() {
             <div className="breadcrumbs"><span>Workspace</span><span className="crumb-slash">/</span><strong>{section}</strong></div>
           </div>
           <div className="topbar-actions">
+            {!userEmail && <button className="button button-primary" onClick={() => setSection('Settings')}>Daftar / Masuk</button>}
             <span className="system-status"><span className="status-pulse" /> Preview mode</span>
             <button className="icon-button notification-button" aria-label="Notifikasi"><Bell size={18} /><i /></button>
             <div className="top-avatar">{profileName.charAt(0).toUpperCase() || 'C'}</div>
