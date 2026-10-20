@@ -10,7 +10,7 @@ async function sha256(value: string) {
 type ModerationRule = { phrase: string; action: "reject" | "mask" | "hide" };
 function escapeRegExp(value: string) { return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
 function matchingRules(text: string, rules: ModerationRule[]) {
-  return rules.filter((rule) => rule.phrase.trim() && new RegExp(escapeRegExp(rule.phrase.trim()), "i").test(text));
+  return rules.filter((rule) => rule.phrase.trim() && new RegExp(`(^|[^\\p{L}\\p{N}_])${escapeRegExp(rule.phrase.trim())}(?=$|[^\\p{L}\\p{N}_])`, "iu").test(text));
 }
 function applyModeration(payload: Record<string, unknown>, rules: ModerationRule[]) {
   const contentKeys = ["message", "text", "donor_message", "content"];
@@ -28,7 +28,7 @@ function applyModeration(payload: Record<string, unknown>, rules: ModerationRule
     let masked = value;
     for (const rule of rules) {
       if (rule.action !== "mask" || !rule.phrase.trim()) continue;
-      masked = masked.replace(new RegExp(escapeRegExp(rule.phrase.trim()), "gi"), "•".repeat(Math.min(12, rule.phrase.trim().length)));
+      masked = masked.replace(new RegExp(`(^|[^\\p{L}\\p{N}_])(${escapeRegExp(rule.phrase.trim())})(?=$|[^\\p{L}\\p{N}_])`, "giu"), (_match, prefix: string, word: string) => prefix + "•".repeat(Math.min(12, word.length)));
     }
     next[key] = masked;
   }
