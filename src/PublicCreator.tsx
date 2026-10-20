@@ -35,7 +35,7 @@ export default function PublicCreator() {
         {creator.bio && <p style={{maxWidth:460,margin:'0 auto 24px',color:'#b6bdd0',lineHeight:1.8,whiteSpace:'pre-wrap'}}>{creator.bio}</p>}
         <div style={{border:'1px solid #3b3155',background:'#171329',borderRadius:16,padding:18,textAlign:'left',display:'flex',gap:12,alignItems:'flex-start'}}><ShieldCheck size={20} color="#9a7cff"/><div><strong>Dukungan belum tersedia</strong><p style={{margin:'6px 0 0',color:'#b6bdd0',fontSize:14,lineHeight:1.7}}>Halaman ini masih dalam beta. Tombol sawer dan pembayaran belum diaktifkan sampai verifikasi merchant selesai.</p></div></div>
       </> : null}
-      <footer style={{marginTop:30,borderTop:'1px solid #242b3e',paddingTop:20,color:'#737d96',fontSize:13,display:'flex',justifyContent:'center',alignItems:'center',gap:7}}><Heart size={14}/> Dibangun dengan Berisawer · Beta</footer>
+      <footer style={{marginTop:30,borderTop:'1px solid #242b3e',paddingTop:20,color:'#737d96',fontSize:13,display:'flex',justifyContent:'center',alignItems:'center',gap:7}}><Heart size={14}/> Dibangun dengan Bagisawer · Beta</footer>
     </section>
   </main>
 }
