@@ -78,9 +78,11 @@ function Dashboard() {
         } else {
           const base = (session.user.email?.split('@')[0] ?? 'creator').toLowerCase().replace(/[^a-z0-9_]/g, '_').replace(/^_+|_+$/g, '').slice(0, 20) || 'creator'
           const suggested = `${base}_${session.user.id.replace(/-/g, '').slice(0, 6)}`.slice(0, 30)
-          const { error: insertError } = await supabase.from('creator_profiles').insert({ id: session.user.id, display_name: base.slice(0, 48) || 'Creator', handle: suggested, bio: '', is_public: true })
+          const { error: insertError } = await supabase.from('creator_profiles').upsert({ id: session.user.id, display_name: base.slice(0, 48) || 'Creator', handle: suggested, bio: '', is_public: true }, { onConflict: 'id', ignoreDuplicates: true })
           if (insertError) throw insertError
-          if (alive) { setProfileName(base.slice(0, 48) || 'Creator'); setHandle(suggested); setBio(''); setProfilePublic(true) }
+          const { data: latest, error: latestError } = await supabase.from('creator_profiles').select('display_name,handle,bio,is_public').eq('id', session.user.id).single()
+          if (latestError) throw latestError
+          if (alive) { setProfileName(latest.display_name); setHandle(latest.handle); setBio(latest.bio ?? ''); setProfilePublic(Boolean(latest.is_public)) }
         }
       } catch (error) {
         if (alive) setAuthMessage('Profil akun belum bisa dimuat: ' + (error instanceof Error ? error.message : 'kesalahan tidak diketahui'))
