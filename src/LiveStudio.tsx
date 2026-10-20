@@ -7,6 +7,7 @@ import {
 import './live-studio.css'
 import LiveToolPricing from './LiveToolPricing'
 import ContentModeration from './ContentModeration'
+import AlertSoundSettings from './AlertSoundSettings'
 import { supabase } from './lib/supabase'
 
 type ToolKey = 'voice' | 'media' | 'ticker' | 'subathon' | 'alerts' | 'goals' | 'polls' | 'redeems'
@@ -183,6 +184,7 @@ export default function LiveStudio() {
       <div className="live-poll-preview"><span>POLL PREVIEW</span><strong>{pollTitle || 'Pertanyaan polling'}</strong><div><span>{pollA || 'Pilihan A'}</span><span>{pollB || 'Pilihan B'}</span></div><small>Voting belum tersambung ke chat atau database.</small></div>
     </section>
     <LiveToolPricing />
+    <AlertSoundSettings />
     <ContentModeration />
     <div className="live-roadmap"><Sparkles size={19} /><div><strong>Integrasi berikutnya</strong><p>Supabase realtime untuk event, autentikasi overlay token, TTS provider, media moderation, chat platform, OBS browser source, serta timer subathon yang hanya berubah dari event terverifikasi.</p></div></div>
   </div>
