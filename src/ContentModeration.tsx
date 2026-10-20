@@ -43,7 +43,7 @@ export default function ContentModeration() {
   function addOrUpdate() {
     const words = phrase
       .trim()
-      .split(/[\\s,;]+/)
+      .split(/[\s,;]+/)
       .map(word => word.trim())
       .filter(Boolean)
 
