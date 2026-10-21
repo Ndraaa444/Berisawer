@@ -327,29 +327,44 @@ function PageHeading({ eyebrow, title, description, action }: { eyebrow: string;
 }
 
 function Overview({ onNavigate }: { onNavigate: (section: Section) => void }) {
+  const [loading, setLoading] = useState(true)
+  const [total, setTotal] = useState(0)
+  const [count, setCount] = useState(0)
+  const [recent, setRecent] = useState<Array<{id:string;donor_name:string;message:string;amount:number;created_at:string}>>([])
+  const [loadError, setLoadError] = useState('')
+  useEffect(() => {
+    let alive = true
+    async function load() {
+      if (!supabase) { if(alive){setLoadError('Backend Supabase belum dikonfigurasi.');setLoading(false)}; return }
+      const { data: auth } = await supabase.auth.getUser()
+      if (!auth.user) { if(alive){setLoadError('Masuk untuk memuat statistik akun dan transaksi nyata.');setLoading(false)}; return }
+      const { data, error } = await supabase.from('donations').select('id,donor_name,message,amount,created_at').eq('creator_id',auth.user.id).eq('status','paid').order('created_at',{ascending:false}).limit(1000)
+      if (!alive) return
+      if (error) setLoadError('Statistik transaksi gagal dimuat dari database.')
+      else { const rows = data ?? []; setRecent(rows.slice(0,5) as typeof recent); setCount(rows.length); setTotal(rows.reduce((sum,row)=>sum+Number(row.amount||0),0)); }
+      setLoading(false)
+    }
+    void load(); return () => {alive=false}
+  }, [])
+  const money = (value:number) => formatMoney(value)
   const stats = [
-    { title: 'Total sawer', value: formatMoney(0), change: 'Belum ada transaksi live', icon: Wallet, tone: 'violet' },
-    { title: 'Donasi masuk', value: '0', change: 'Data produksi belum tersambung', icon: Heart, tone: 'pink' },
-    { title: 'Rata-rata sawer', value: formatMoney(0), change: 'Menunggu aktivasi pembayaran', icon: CircleDollarSign, tone: 'blue' },
-    { title: 'Overlay status', value: 'Siap diatur', change: 'Token overlay belum dibuat', icon: Radio, tone: 'green' },
+    { title: 'Total sawer (data termuat)', value: money(total), change: 'Akumulasi transaksi paid yang termuat', icon: Wallet, tone: 'violet' },
+    { title: 'Transaksi paid', value: String(count), change: 'Transaksi berstatus paid', icon: Heart, tone: 'pink' },
+    { title: 'Rata-rata sawer', value: money(count ? total / count : 0), change: 'Berdasarkan transaksi termuat', icon: CircleDollarSign, tone: 'blue' },
+    { title: 'Overlay status', value: 'Kelola token', change: 'Token aman dibuat saat dibutuhkan', icon: Radio, tone: 'green' },
   ]
   return <>
-    <PageHeading eyebrow="CREATOR OVERVIEW" title="Dashboard" description="Pantau dukungan komunitas dan siapkan pengalaman streaming kamu." action={<button className="button button-primary" onClick={() => onNavigate('Overlay')}><MonitorPlay size={16} /> Atur overlay</button>} />
-    <div className="welcome-card">
-      <div className="welcome-copy"><div className="welcome-kicker"><Sparkles size={14} /> CREATOR CONTROL CENTER</div><h2>Halo, Creator. <span>Siap live?</span></h2><p>Bangun ruang dukungan yang lebih dekat dengan komunitasmu. Konfigurasikan profil dan overlay sebelum mengaktifkan pembayaran.</p><button className="button button-light" onClick={() => onNavigate('Settings')}>Lengkapi profil <ArrowUpRight size={15} /></button></div>
-      <div className="welcome-art" aria-hidden="true"><div className="orbit orbit-one" /><div className="orbit orbit-two" /><div className="orbit-core"><Heart size={34} fill="currentColor" /></div><div className="float-chip chip-one"><Sparkles size={15} /> Supporter</div><div className="float-chip chip-two"><Activity size={15} /> Live ready</div></div>
-    </div>
-    <div className="section-heading"><div><h2>Ringkasan performa</h2><p>Statistik akan terisi setelah sumber data produksi dihubungkan.</p></div><span className="sample-pill"><span /> DATA PREVIEW</span></div>
-    <div className="stats-grid">{stats.map(({ title, value, change, icon: Icon, tone }) => <div className="stat-card" key={title}><div className="stat-top"><span>{title}</span><span className={`stat-icon ${tone}`}><Icon size={18} /></span></div><strong className="stat-value">{value}</strong><div className="stat-bottom"><span className="stat-change">{change}</span></div></div>)}</div>
+    <PageHeading eyebrow="CREATOR OVERVIEW" title="Dashboard" description="Statistik diambil dari transaksi nyata di backend untuk akun yang sedang masuk." action={<button className="button button-primary" onClick={() => onNavigate('Overlay')}><MonitorPlay size={16} /> Atur overlay</button>} />
+    {loadError && <div className="inline-message" role="status"><Activity size={16}/><span>{loadError}</span><button className="button button-secondary" onClick={() => onNavigate('Settings')}>Masuk / atur akun</button></div>}
+    <div className="stats-grid">{stats.map(({title,value,change,icon:Icon,tone})=><div className="stat-card" key={title}><div className="stat-top"><span>{title}</span><span className={`stat-icon ${tone}`}><Icon size={18}/></span></div><strong className="stat-value">{loading ? 'Memuat…' : value}</strong><div className="stat-bottom"><span className="stat-change">{change}</span></div></div>)}</div>
     <div className="lower-grid">
-      <section className="panel activity-panel"><div className="panel-heading"><div><h2>Aktivitas terbaru</h2><p>Contoh tampilan riwayat sawer</p></div><button className="text-button" onClick={() => onNavigate('Donations')}>Lihat semua <ArrowUpRight size={14} /></button></div>
-        {sampleDonations.map((donation, index) => <div className="activity-row" key={donation.name}><div className={`donor-avatar donor-${index}`}>{donation.name.charAt(0)}</div><div className="donor-info"><strong>{donation.name}</strong><span>{donation.message}</span><small>{donation.time}</small></div><strong className="donation-amount">{donation.amount}</strong></div>)}
+      <section className="panel activity-panel"><div className="panel-heading"><div><h2>Aktivitas terbaru</h2><p>Transaksi nyata berstatus paid dari database</p></div><button className="text-button" onClick={()=>onNavigate('Donations')}>Lihat semua <ArrowUpRight size={14}/></button></div>
+        {loading ? <div className="empty-state">Memuat transaksi…</div> : recent.length ? recent.map((d,index)=><div className="activity-row" key={d.id}><div className={`donor-avatar donor-${index}`}>{(d.donor_name||'A').charAt(0)}</div><div className="donor-info"><strong>{d.donor_name||'Anonim'}</strong><span>{d.message||'—'}</span><small>{new Date(d.created_at).toLocaleString('id-ID')}</small></div><strong className="donation-amount">{money(Number(d.amount)||0)}</strong></div>) : <div className="empty-state">Belum ada transaksi nyata berstatus paid.</div>}
       </section>
-      <section className="panel setup-panel"><div className="panel-heading"><div><h2>Checklist awal</h2><p>Langkah sebelum go-live</p></div><span className="check-count">1/3</span></div>
-        <div className="checklist-item"><span className="check-icon complete"><Check size={13} /></span><div><strong>Proyek backend</strong><small>Struktur Supabase tersedia</small></div><span className="tiny-state done">OK</span></div>
-        <div className="checklist-item"><span className="check-icon"><span /></span><div><strong>Profil creator</strong><small>Tambahkan nama dan handle</small></div><button className="tiny-link" onClick={() => onNavigate('Settings')}>Atur</button></div>
-        <div className="checklist-item"><span className="check-icon"><span /></span><div><strong>Verifikasi pembayaran</strong><small>QRIS/gateway masih ditunda</small></div><span className="tiny-state pending">NANTI</span></div>
-        <div className="setup-progress"><span style={{ width: '33.33%' }} /></div>
+      <section className="panel setup-panel"><div className="panel-heading"><div><h2>Status peluncuran</h2><p>Fitur yang masih harus diselesaikan</p></div><span className="check-count">BETA</span></div>
+        <div className="checklist-item"><span className="check-icon complete"><Check size={13}/></span><div><strong>Backend Supabase</strong><small>Tabel inti tersedia</small></div><span className="tiny-state done">OK</span></div>
+        <div className="checklist-item"><span className="check-icon"><span/></span><div><strong>Profil kreator</strong><small>Pastikan nama dan handle benar</small></div><button className="tiny-link" onClick={()=>onNavigate('Settings')}>Atur</button></div>
+        <div className="checklist-item"><span className="check-icon"><span/></span><div><strong>Pembayaran</strong><small>Belum aktif hingga verifikasi merchant</small></div><span className="tiny-state pending">TUNDA</span></div>
       </section>
     </div>
   </>
