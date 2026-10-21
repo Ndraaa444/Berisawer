@@ -157,7 +157,7 @@ export default function LiveStudio() {
       return
     }
     setTicker(text.slice(0, 180))
-    setMessage('Preview lokal diperbarui. Login diperlukan untuk mengirim event ke overlay live.')
+    setMessage('Masuk ke akun kreator untuk mengirim Running Text ke server. Tidak ada aktivitas lokal yang ditampilkan sebagai live.')
   }
 
   function addTimer() {
@@ -173,29 +173,21 @@ export default function LiveStudio() {
       <div className="live-stat"><span>Antrean interaksi</span><strong>{queue.length}</strong><span className="live-stat-foot">Event backend tersimpan</span></div>
       <div className="live-stat"><span>Target komunitas</span><strong>{goalPercent}%</strong><span className="live-stat-foot">Total dukungan terverifikasi akan tampil setelah alur pembayaran aktif</span></div>
     </div>
-    <section className="panel live-config-panel" style={{marginBottom:24}}><div className="panel-heading"><div><h2><Zap size={17} /> Uji alert overlay</h2><p>Kirim event sintetis ke overlay akun untuk menguji suara, TTS, moderasi, dan koneksi OBS. Tidak membuat donasi atau pembayaran.</p></div><span className="live-mini-status">DEMO AMAN</span></div><button className="button button-primary" disabled={!userId || !supabase} onClick={async () => { if (!supabase || !userId) { setMessage('Login kreator diperlukan untuk mengirim demo ke overlay.'); return } setMessage('Mengirim alert demo ke overlay…'); const { data, error } = await supabase.functions.invoke('live-studio-event', { body: { event_type: 'demo_alert', payload: { message: 'Ini adalah alert demo Bagisawer. Tidak ada pembayaran yang dilakukan.' } } }); if (error || !data?.event) { setMessage(data?.error === 'alerts_disabled' ? 'Aktifkan fitur Alert di atas terlebih dahulu.' : 'Alert demo gagal dikirim. Pastikan Edge Function live-studio-event sudah diperbarui.'); return } setMessage('Alert demo terkirim. Buka overlay Alerts di OBS/browser untuk mendengar Shine/TTS. Tidak ada transaksi uang.'); }}><Zap size={15} /> Kirim alert demo</button><p className="field-help">Gunakan URL overlay dengan fitur <code>alerts</code>. Untuk browser OBS, aktifkan audio pada Browser Source dan pastikan tab tidak dibisukan.</p></section>
-    <div className="live-section-heading"><div><h2>Semua live tools</h2><p>Aktifkan atau nonaktifkan modul. {settingsLoaded ? (userId ? 'Pengaturan akun dimuat.' : 'Mode preview lokal.') : 'Memuat pengaturan…'}</p></div><span className="live-section-counter">{enabledCount} AKTIF</span></div>
+
+    <div className="live-section-heading"><div><h2>Semua live tools</h2><p>Aktifkan atau nonaktifkan modul. {settingsLoaded ? (userId ? 'Pengaturan akun dimuat dari server.' : 'Login diperlukan untuk mengakses fitur produksi.') : 'Memuat pengaturan…'}</p></div><span className="live-section-counter">{enabledCount} AKTIF</span></div>
     <div className="live-tool-grid">{tools.map(tool => { const Icon = tool.icon; return <article className={`live-tool-card ${tool.enabled ? 'tool-enabled' : ''}`} key={tool.key}>
       <div className="live-tool-top"><span className="live-tool-icon"><Icon size={20} /></span><span className="live-tool-tag">{tool.tag}</span></div>
       <div className="live-tool-copy"><h3>{tool.title}</h3><p>{tool.description}</p></div>
       <div className="live-tool-bottom"><span className={tool.enabled ? 'tool-state state-on' : 'tool-state'}>{tool.enabled ? (userId ? 'Aktif • akun tersimpan' : 'Belum tersimpan di server') : 'Nonaktif'}</span><button className={`live-toggle ${tool.enabled ? 'toggle-on' : ''}`} onClick={() => toggleTool(tool.key)} aria-label={`${tool.enabled ? 'Nonaktifkan' : 'Aktifkan'} ${tool.title}`}>{tool.enabled ? <ToggleRight size={28} /> : <ToggleLeft size={28} />}</button></div>
     </article> })}</div>
     <div className="live-config-grid">
-      <section className="panel live-config-panel"><div className="panel-heading"><div><h2><MessageSquareText size={17} /> Running Text</h2><p>Konten teks untuk browser overlay</p></div><span className="live-mini-status">LOCAL</span></div>
+      <section className="panel live-config-panel"><div className="panel-heading"><div><h2><MessageSquareText size={17} /> Running Text</h2><p>Konten teks untuk browser overlay</p></div><span className="live-mini-status">SERVER</span></div>
         <label className="field-label" htmlFor="ticker-draft">PESAN BERJALAN</label><textarea id="ticker-draft" className="live-textarea" value={tickerDraft} maxLength={180} onChange={e => setTickerDraft(e.target.value)} />
-        <div className="live-field-footer"><span>{tickerDraft.length}/180 karakter</span><button className="button button-primary" onClick={publishTicker}>Perbarui preview</button></div>
-        <div className="ticker-demo"><span>BAGISAWER</span><div>{ticker || 'Teks berjalan akan tampil di sini'}</div></div>
+        <div className="live-field-footer"><span>{tickerDraft.length}/180 karakter</span><button className="button button-primary" onClick={publishTicker}>Kirim ke overlay</button></div>
+        <p className="field-help">Pesan hanya dianggap aktif setelah server mengonfirmasi event tersimpan.</p>
       </section>
-      <section className="panel live-config-panel"><div className="panel-heading"><div><h2><Trophy size={17} /> Target Komunitas</h2><p>Target donasi simulasi</p></div><span className="live-mini-status">CONTOH</span></div>
-        <label className="field-label" htmlFor="goal-amount">TARGET (RUPIAH)</label><input id="goal-amount" className="form-input" type="number" min="1" value={goal} onChange={e => setGoal(e.target.value)} />
-        <div className="goal-progress-copy"><strong>{goalPercent}% tercapai</strong><span>{new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',maximumFractionDigits:0}).format(goalValue)}</span></div><div className="goal-progress-track"><span style={{width: `${goalPercent}%`}} /></div>
-        <button className="button button-secondary live-demo-button" onClick={() => {setGoalCurrent(value => Math.min(goalValue, value + 25000)); setMessage('Contoh progres target diperbarui secara lokal.') }}><Plus size={15} /> Simulasikan +Rp25.000</button>
-      </section>
-      <section className="panel live-config-panel"><div className="panel-heading"><div><h2><Timer size={17} /> Subathon Timer</h2><p>Simulasi penambahan waktu</p></div><span className="live-mini-status">SIMULASI</span></div>
-        <div className="subathon-display"><Clock3 size={22} /><strong>02:14:36</strong><span>Timer contoh • bukan timer live</span></div>
-        <label className="field-label" htmlFor="timer-minutes">TAMBAH WAKTU (MENIT)</label><input id="timer-minutes" className="form-input" type="number" min="1" max="180" value={timerMinutes} onChange={e => setTimerMinutes(e.target.value)} />
-        <button className="button button-primary live-demo-button" onClick={addTimer}><Plus size={15} /> Simulasikan tambah waktu</button>
-      </section>
+
+
       <section className="panel live-config-panel"><div className="panel-heading"><div><h2><Volume2 size={17} /> Voice Chat & Media Share</h2><p>Kontrol dasar keamanan antrean</p></div><span className="live-mini-status">MODERASI</span></div>
         <label className="live-check-row"><input type="checkbox" checked={safeMode} onChange={e => setSafeMode(e.target.checked)} /><span><strong>Mode moderasi ketat</strong><small>Permintaan baru masuk moderasi sebelum diputar.</small></span></label>
         <div className="live-security-note"><ShieldCheck size={17} /><span>{safeMode ? 'Filter moderasi ditandai aktif untuk preview.' : 'Moderasi ketat dimatikan pada preview; jangan gunakan untuk live publik.'}</span></div>
@@ -203,15 +195,8 @@ export default function LiveStudio() {
         <p className="field-help">Media tidak otomatis diputar. Implementasi produksi perlu whitelist domain, batas durasi, filter URL, dan persetujuan moderator.</p>
       </section>
     </div>
-    <section className="panel live-queue-panel"><div className="panel-heading"><div><h2><Radio size={17} /> Antrean interaksi</h2><p>Item demo yang dapat dikelola tanpa memutar media sungguhan.</p></div><span className="live-section-counter">{queue.length} ITEM</span></div>
-      {queue.map(item => <div className="live-queue-row" key={item.id}><div className="live-queue-icon"><MonitorPlay size={17} /></div><div className="live-queue-copy"><strong>{item.title}</strong><span>{item.detail}</span></div><span className={`live-queue-status ${item.status === 'Aktif' ? 'queue-active' : ''}`}>{item.status}</span><button className="live-queue-remove" onClick={() => {setQueue(current => current.filter(row => row.id !== item.id)); setMessage('Item dihapus dari antrean preview.')}} aria-label={`Hapus ${item.title}`}><Trash2 size={16} /></button></div>)}
-      {queue.length === 0 && <div className="empty-state">Antrean preview kosong. Tambahkan item dari panel Voice Chat & Media Share.</div>}
-    </section>
-    <section className="panel live-config-panel live-poll-panel"><div className="panel-heading"><div><h2><Activity size={17} /> Polling komunitas</h2><p>Siapkan pilihan untuk penonton (preview lokal)</p></div><span className="live-mini-status">DEMO</span></div>
-      <label className="field-label" htmlFor="poll-title">PERTANYAAN</label><input id="poll-title" className="form-input" value={pollTitle} onChange={e => setPollTitle(e.target.value)} maxLength={100} />
-      <div className="live-poll-options"><div><label className="field-label" htmlFor="poll-a">PILIHAN A</label><input id="poll-a" className="form-input" value={pollA} onChange={e => setPollA(e.target.value)} maxLength={60} /></div><div><label className="field-label" htmlFor="poll-b">PILIHAN B</label><input id="poll-b" className="form-input" value={pollB} onChange={e => setPollB(e.target.value)} maxLength={60} /></div></div>
-      <div className="live-poll-preview"><span>POLL PREVIEW</span><strong>{pollTitle || 'Pertanyaan polling'}</strong><div><span>{pollA || 'Pilihan A'}</span><span>{pollB || 'Pilihan B'}</span></div><small>Voting belum tersambung ke chat atau database.</small></div>
-    </section>
+
+
     <LiveToolPricing />
     <AlertSoundSettings />
     <ContentModeration />
