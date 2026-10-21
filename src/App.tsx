@@ -264,7 +264,7 @@ function Dashboard() {
       <aside className={`sidebar ${menuOpen ? 'sidebar-open' : ''}`}>
         <div className="brand">
           <div className="brand-mark"><Sparkles size={21} /></div>
-          <span>beri<span className="brand-accent">sawer</span></span>
+          <span>bagi<span className="brand-accent">sawer</span></span>
           <button className="icon-button mobile-close" aria-label="Tutup menu" onClick={() => setMenuOpen(false)}><X size={18} /></button>
         </div>
         <div className="workspace-label">WORKSPACE</div>
