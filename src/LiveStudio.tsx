@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  Activity, AudioLines, Check, Clock3, MessageSquareText, MonitorPlay,
+  Activity, AudioLines, Check, MessageSquareText,
   Music2, Plus, Radio, ShieldCheck, Sparkles, Timer, ToggleLeft, ToggleRight,
-  Save, Trash2, Trophy, Volume2, Zap,
+  Save, Trophy, Volume2, Zap,
 } from 'lucide-react'
 import './live-studio.css'
 import LiveToolPricing from './LiveToolPricing'
@@ -29,12 +29,12 @@ export default function LiveStudio() {
   const [tools, setTools] = useState(initialTools)
   const [userId, setUserId] = useState<string | null>(null)
   const [settingsLoaded, setSettingsLoaded] = useState(false)
-  const [ticker, setTicker] = useState('Terima kasih sudah mendukung stream ini!')
+  const [, setTicker] = useState('Terima kasih sudah mendukung stream ini!')
   const [tickerDraft, setTickerDraft] = useState('Halo chat! Jangan lupa follow dan jaga suasana tetap nyaman ✨')
   const [goal, setGoal] = useState('500000')
   const [goalCurrent] = useState(0)
   const [timerMinutes, setTimerMinutes] = useState('10')
-  const [queue, setQueue] = useState(initialQueue)
+  const queue = initialQueue
   const [newRequest, setNewRequest] = useState('')
   const [safeMode, setSafeMode] = useState(true)
   const [message, setMessage] = useState('')
@@ -160,9 +160,6 @@ export default function LiveStudio() {
     setMessage('Masuk ke akun kreator untuk mengirim Running Text ke server. Tidak ada aktivitas lokal yang ditampilkan sebagai live.')
   }
 
-  function addTimer() {
-    setMessage('Subathon belum tersambung ke event backend produksi. Timer tidak diubah dan tidak ada simulasi yang ditampilkan.')
-  }
 
   return <div className="live-studio">
     <div className="page-heading"><div><div className="eyebrow">STREAMER TOOLKIT</div><h1>Live Studio</h1><p>Kelola interaksi livestream, overlay, antrean, dan aktivitas komunitas dari satu tempat.</p></div><div className="heading-action"><button className="button button-secondary" type="button" onClick={saveStudioSettings}><Save size={15} /> Simpan pengaturan</button><span className="live-preview-pill"><span /> {userId ? 'DATA AKUN' : 'LOGIN DIPERLUKAN'}</span></div></div>
