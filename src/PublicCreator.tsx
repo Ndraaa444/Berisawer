@@ -28,7 +28,7 @@ export default function PublicCreator() {
 
   return <main style={{minHeight:'100vh',padding:'32px 18px',display:'grid',placeItems:'center',background:'radial-gradient(ellipse at 50% 0%,rgba(91,70,173,.22),transparent 55%),#080b14',color:'#e8eaf3',fontFamily:'DM Sans, sans-serif'}}>
     <section style={{width:'100%',maxWidth:620,border:'1px solid #242b3e',borderRadius:24,background:'#101522',padding:'36px 28px',textAlign:'center',boxShadow:'0 24px 80px #0005'}}>
-      <div style={{display:'inline-flex',alignItems:'center',gap:9,fontWeight:700,fontSize:20,marginBottom:28}}><Sparkles size={22} color="#9a7cff"/> beri<span style={{color:'#9a7cff'}}>sawer</span></div>
+      <div style={{display:'inline-flex',alignItems:'center',gap:9,fontWeight:700,fontSize:20,marginBottom:28}}><Sparkles size={22} color="#9a7cff"/> bagi<span style={{color:'#9a7cff'}}>sawer</span></div>
       {loading ? <p role="status">Memuat halaman kreator…</p> : error ? <><h1 style={{fontSize:25}}>Halaman belum tersedia</h1><p style={{color:'#a0a8bf',lineHeight:1.7}}>{error}</p></> : creator ? <>
         <div style={{width:88,height:88,borderRadius:'50%',margin:'0 auto 18px',display:'grid',placeItems:'center',overflow:'hidden',background:'#24203b',border:'1px solid #51427b'}}>{creator.avatar_url ? <img src={creator.avatar_url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/> : <span style={{fontSize:34,fontWeight:700,color:'#c9baff'}}>{creator.display_name.slice(0,1).toUpperCase()}</span>}</div>
         <h1 style={{fontSize:32,margin:'0 0 8px'}}>{creator.display_name}</h1><p style={{color:'#9a7cff',margin:'0 0 20px'}}>@{creator.handle}</p>
