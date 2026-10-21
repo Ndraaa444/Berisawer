@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   Activity, AudioLines, Check, Clock3, MessageSquareText, MonitorPlay,
   Music2, Plus, Radio, ShieldCheck, Sparkles, Timer, ToggleLeft, ToggleRight,
-  Trash2, Trophy, Volume2, Zap,
+  Save, Trash2, Trophy, Volume2, Zap,
 } from 'lucide-react'
 import './live-studio.css'
 import LiveToolPricing from './LiveToolPricing'
@@ -60,9 +60,28 @@ export default function LiveStudio() {
           if (error) throw error
           const saved = data?.live_tools_config?.tool_switches
           if (saved && typeof saved === 'object') switches = saved as Record<string, boolean>
+          const studio = data?.live_tools_config?.studio
+          if (studio && typeof studio === 'object') {
+            if (typeof studio.tickerDraft === 'string') setTickerDraft(studio.tickerDraft)
+            if (typeof studio.goalAmount === 'string') setGoal(studio.goalAmount)
+            if (typeof studio.timerMinutes === 'string') setTimerMinutes(studio.timerMinutes)
+            if (typeof studio.pollTitle === 'string') setPollTitle(studio.pollTitle)
+            if (typeof studio.pollA === 'string') setPollA(studio.pollA)
+            if (typeof studio.pollB === 'string') setPollB(studio.pollB)
+          }
         } else {
           const raw = localStorage.getItem('berisawer-live-studio:preview')
           if (raw) switches = JSON.parse(raw) as Record<string, boolean>
+          const studioRaw = localStorage.getItem('bagisawer-live-studio-settings:preview')
+          if (studioRaw) {
+            const studio = JSON.parse(studioRaw) as Record<string, unknown>
+            if (typeof studio.tickerDraft === 'string') setTickerDraft(studio.tickerDraft)
+            if (typeof studio.goalAmount === 'string') setGoal(studio.goalAmount)
+            if (typeof studio.timerMinutes === 'string') setTimerMinutes(studio.timerMinutes)
+            if (typeof studio.pollTitle === 'string') setPollTitle(studio.pollTitle)
+            if (typeof studio.pollA === 'string') setPollA(studio.pollA)
+            if (typeof studio.pollB === 'string') setPollB(studio.pollB)
+          }
         }
         if (alive && switches) setTools(current => current.map(tool => typeof switches?.[tool.key] === 'boolean' ? { ...tool, enabled: switches[tool.key] } : tool))
       } catch {
@@ -98,6 +117,36 @@ export default function LiveStudio() {
     } else {
       localStorage.setItem('berisawer-live-studio:preview', JSON.stringify(switches))
       setMessage('Switch disimpan di browser preview ini saja. Masuk untuk menyinkronkan ke akun.')
+    }
+  }
+
+  async function saveStudioSettings() {
+    const studio = {
+      tickerDraft: tickerDraft.slice(0, 180),
+      goalAmount: String(Math.max(1, Math.floor(Number(goal) || 1))),
+      timerMinutes: String(Math.max(1, Math.min(180, Math.floor(Number(timerMinutes) || 1)))),
+      pollTitle: pollTitle.slice(0, 100),
+      pollA: pollA.slice(0, 60),
+      pollB: pollB.slice(0, 60),
+    }
+    setMessage('Menyimpan pengaturan Live Studio…')
+    try {
+      if (userId && supabase) {
+        const { data, error: readError } = await supabase.from('creator_settings').select('live_tools_config').eq('user_id', userId).maybeSingle()
+        if (readError) throw readError
+        const current = data?.live_tools_config && typeof data.live_tools_config === 'object' ? data.live_tools_config : {}
+        const { error } = await supabase.from('creator_settings').upsert({
+          user_id: userId,
+          live_tools_config: { ...current, studio },
+        }, { onConflict: 'user_id' })
+        if (error) throw error
+        setMessage('Pengaturan Live Studio tersimpan permanen ke Supabase.')
+      } else {
+        localStorage.setItem('bagisawer-live-studio-settings:preview', JSON.stringify(studio))
+        setMessage('Pengaturan tersimpan di browser ini saja. Masuk ke akun untuk menyinkronkan ke Supabase.')
+      }
+    } catch {
+      setMessage('Pengaturan Live Studio gagal disimpan ke server. Periksa koneksi dan izin tabel; perubahan belum dianggap tersimpan.')
     }
   }
 
@@ -137,7 +186,7 @@ export default function LiveStudio() {
   }
 
   return <div className="live-studio">
-    <div className="page-heading"><div><div className="eyebrow">STREAMER TOOLKIT</div><h1>Live Studio</h1><p>Kelola interaksi livestream, overlay, antrean, dan aktivitas komunitas dari satu tempat.</p></div><div className="heading-action"><span className="live-preview-pill"><span /> PREVIEW MODE</span></div></div>
+    <div className="page-heading"><div><div className="eyebrow">STREAMER TOOLKIT</div><h1>Live Studio</h1><p>Kelola interaksi livestream, overlay, antrean, dan aktivitas komunitas dari satu tempat.</p></div><div className="heading-action"><button className="button button-secondary" type="button" onClick={saveStudioSettings}><Save size={15} /> Simpan pengaturan</button><span className="live-preview-pill"><span /> PREVIEW MODE</span></div></div>
     <div className="live-safety-banner"><ShieldCheck size={20} /><div><strong>Mode aman aktif — pembayaran tetap nonaktif</strong><p>Sudah terhubung: profil akun, token overlay, alert demo, Running Text, pengaturan suara/TTS, filter moderasi, dan penyimpanan switch. Masih preview: timer subathon, target komunitas, polling, antrean request, dan media share; belum terhubung ke chat YouTube/Twitch atau donasi nyata.</p></div></div>
     {message && <div className="live-feedback" role="status"><Check size={16} />{message}<button onClick={() => setMessage('')} aria-label="Tutup pesan">×</button></div>}
     <div className="live-stats-grid">
