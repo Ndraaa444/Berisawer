@@ -54,8 +54,9 @@ function Dashboard() {
       setUserId(session?.user.id ?? null)
       if (!session?.user) {
         setProfileName('Creator')
-        setHandle('creator_demo')
+        setHandle('')
         setBio('')
+        setSection('Settings')
         return
       }
       setProfileLoading(true)
@@ -271,8 +272,8 @@ function Dashboard() {
         <nav className="nav-list" aria-label="Navigasi utama">
           {navigation.map(({ label, icon: Icon }) => (
             <button key={label} className={`nav-item ${section === label ? 'nav-active' : ''}`} onClick={() => { setSection(label); setMenuOpen(false) }}>
-              <Icon size={18} strokeWidth={1.8} /><span>{label}</span>
-              {label === 'Donations' && <span className="nav-dot" />}
+              <Icon size={18} strokeWidth={1.8} /><span>{label === 'Settings' && !userEmail ? 'Profil & Login' : label}</span>
+              {label === 'Settings' && !userEmail ? <span className="nav-dot" /> : null}
             </button>
           ))}
         </nav>
@@ -439,7 +440,7 @@ function SettingsPanel({ profileName, setProfileName, handle, setHandle, bio, se
   profileName: string; setProfileName: (value: string) => void; handle: string; setHandle: (value: string) => void; bio: string; setBio: (value: string) => void; profilePublic: boolean; setProfilePublic: (value: boolean) => void; onSave: (event: FormEvent<HTMLFormElement>) => void; saved: boolean; profileLoading: boolean; email: string; setEmail: (value: string) => void; otp: string; setOtp: (value: string) => void; otpSent: boolean; onLogin: (event: FormEvent<HTMLFormElement>) => void; onVerifyOtp: (event: FormEvent<HTMLFormElement>) => void; authBusy: boolean; userEmail: string | null
 }) {
   return <>
-    <PageHeading eyebrow="WORKSPACE CONFIGURATION" title="Pengaturan" description="Kelola profil kreator. Daftar atau masuk dengan kode OTP 6 digit yang dikirim ke email." />
+    <PageHeading eyebrow="WORKSPACE ACCESS" title={userEmail ? "Pengaturan akun" : "Masuk / Daftar"} description={userEmail ? "Kelola profil kreator dan pengaturan akun Anda." : "Masuk atau buat akun Bagisawer menggunakan email dan kode OTP 6 digit. Tidak perlu kata sandi."} />
     <div className="settings-grid"><section className="panel settings-panel"><div className="panel-heading"><div><h2>Profil kreator</h2><p>{userEmail ? 'Disimpan permanen ke Supabase' : 'Masuk untuk membuat dan menyimpan profil'}</p></div><div className="settings-icon"><Settings size={18} /></div></div>
       <form onSubmit={onSave}><label className="field-label" htmlFor="creator-name">NAMA TAMPILAN</label><input id="creator-name" className="form-input" maxLength={48} value={profileName} onChange={e => setProfileName(e.target.value)} required />
       <label className="field-label" htmlFor="creator-handle">HANDLE PUBLIK</label><div className="handle-input"><span>@</span><input id="creator-handle" maxLength={30} pattern="[a-z0-9_]{3,30}" value={handle} onChange={e => setHandle(e.target.value.toLowerCase())} required /></div><p className="field-help">3–30 karakter: huruf kecil, angka, dan garis bawah. Handle harus unik.</p>
