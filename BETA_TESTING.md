@@ -1,33 +1,55 @@
-# Berisawer — Panduan Beta Tertutup
+# Bagisawer — Checklist Pra-Peluncuran
 
-Terima kasih sudah membantu menguji Berisawer. Ini adalah beta awal; mohon jangan mengandalkan fitur ini untuk transaksi atau siaran komersial.
+Dokumen ini membedakan status deployment dari kesiapan produk. Deployment berstatus READY tidak otomatis berarti semua alur telah lulus pengujian.
 
-## Batasan penting
-- QRIS, Midtrans, dan seluruh pembayaran tetap nonaktif.
-- Gunakan hanya data demo. Tombol **Kirim alert demo** menghasilkan event sintetis, bukan donasi sungguhan.
-- Jangan membagikan URL overlay berisi token, tautan login email, atau informasi akun.
-- TTS bergantung pada suara yang tersedia di browser/perangkat; suara Google/perempuan tidak dijamin tersedia di semua perangkat.
-- Media Share, polling, timer live, dan sebagian tool lain masih berupa preview.
+## Status aman saat ini
+- Domain utama: https://bagisawer.my.id
+- Deployment produksi Vercel terakhir yang diperiksa: READY.
+- Login email OTP: sudah berhasil diuji oleh pemilik proyek.
+- QRIS, Midtrans, dan transaksi uang sungguhan: NONAKTIF sampai verifikasi merchant dan uji sandbox/webhook lengkap.
+- Alert demo: event sintetis, bukan transaksi.
+- Beberapa fitur Live Studio masih berupa preview lokal; jangan mengiklankannya sebagai fitur live yang selesai sebelum pengujian end-to-end.
 
-## Skenario uji
-1. Buka https://berisawer.pages.dev dan buat akun/masuk lewat tautan email.
-2. Buka Pengaturan, simpan nama kreator, handle unik, bio, dan opsi profil publik.
-3. Buka URL publik `/creator/handle-kamu` pada tab privat/perangkat lain. Coba juga profil privat.
-4. Buka Live Studio dan buat URL overlay Alerts dari dashboard. Tambahkan URL ke browser biasa atau OBS Browser Source.
-5. Klik **Kirim alert demo**. Pastikan alert muncul sekali, bunyi Shine terdengar, dan TTS berbicara jika diaktifkan.
-6. Uji volume, bahasa, pilihan suara, pembacaan pesan, dan aturan moderasi.
-7. Muat ulang dashboard dan overlay; periksa apakah pengaturan tetap tersimpan dan event demo tidak diputar ulang tanpa sengaja.
-8. Jika memungkinkan, gunakan akun kedua untuk memastikan data kreator tidak bercampur.
+## Checklist pengujian sebelum membuka beta publik
 
-## Laporkan bug
-Gunakan GitHub Issues dengan template **Laporan bug beta**:
-https://github.com/Ndraaa444/Berisawer/issues/new?template=bug_report.yml
+### Akun dan profil
+- [ ] Daftar dengan email baru; pastikan menerima kode OTP, bukan tautan login.
+- [ ] Verifikasi OTP yang benar, OTP salah, OTP kedaluwarsa, kirim ulang, logout, dan login kembali.
+- [ ] Simpan nama, handle, bio, dan status profil publik; muat ulang dan pastikan tetap tersimpan.
+- [ ] Buka profil publik di jendela privat; pastikan profil privat tidak terbuka.
+- [ ] Uji dengan akun kedua; pastikan pengaturan dan data tidak bercampur.
 
-Sertakan perangkat/browser, langkah reproduksi, hasil yang diharapkan, hasil aktual, dan pesan error yang sudah dibersihkan dari data pribadi.
+### Pengaturan dan keamanan
+- [ ] Simpan harga minimum dan switch fitur, muat ulang, lalu pastikan nilainya tetap sama.
+- [ ] Uji bahwa pengguna hanya dapat membaca/mengubah profil, pengaturan, dan token miliknya.
+- [ ] Pastikan tidak ada service-role key atau payment server key pada frontend.
+- [ ] Pastikan token overlay dapat dicabut dan URL yang dicabut ditolak.
+- [ ] Uji filter moderasi dengan pesan yang diizinkan, disamarkan, dan ditolak.
 
-## Pesan undangan (salin dan kirim manual)
-Halo! Saya sedang membuka uji coba terbatas Berisawer, platform tools livestream yang masih dalam tahap beta. Saya mencari kreator yang bersedia mencoba pendaftaran, profil publik, overlay OBS, dan alert demo, lalu melaporkan bug atau fitur yang membingungkan.
+### Overlay dan Live Studio
+- [ ] Buat URL overlay dari akun kreator; gunakan URL itu di browser dan OBS Browser Source.
+- [ ] Kirim alert demo; pastikan event tampil satu kali, suara/TTS mengikuti pengaturan, dan tidak membuat baris donasi.
+- [ ] Kirim Running Text; pastikan panjang teks dan moderasi diterapkan.
+- [ ] Uji koneksi terputus, pemulihan koneksi, token salah/dicabut, serta overlay yang dibuka pertama kali.
+- [ ] Tandai subathon, target, polling, request, dan Media Share sebagai preview sampai tiap alur benar-benar tersambung ke event backend dan lulus tes.
+- [ ] Uji Chrome desktop, browser mobile, audio OBS, dan tampilan responsif.
 
-Catatan: pembayaran/QRIS belum aktif, jadi pengujian ini hanya menggunakan event demo dan tidak melibatkan uang sungguhan. Jika tertarik, coba https://berisawer.pages.dev dan kirim masukan/bug melalui https://github.com/Ndraaa444/Berisawer/issues/new?template=bug_report.yml.
+### Pembayaran — jangan diaktifkan sebelum semua langkah lulus
+- [ ] Merchant/provider menyetujui akun produksi.
+- [ ] Konfigurasi server-side menggunakan secret produksi yang benar; jangan letakkan secret pada `VITE_*`.
+- [ ] Uji transaksi sandbox sukses, gagal, kedaluwarsa, dibatalkan, nominal tidak cocok, signature salah, dan notifikasi duplikat.
+- [ ] Pastikan status paid hanya berasal dari notifikasi provider yang valid; event overlay dibuat satu kali.
+- [ ] Uji refund dan rekonsiliasi, serta sediakan kebijakan privasi, syarat layanan, kebijakan refund, dan kanal dukungan.
+- [ ] Baru setelah lulus, minta persetujuan eksplisit sebelum mengubah flag pembayaran ke produksi.
 
-Terima kasih sudah membantu membangun Berisawer!
+## Cara melaporkan bug
+Buat GitHub Issue: https://github.com/Ndraaa444/Berisawer/issues/new?template=bug_report.yml
+
+Sertakan browser/perangkat, langkah reproduksi, hasil yang diharapkan, hasil aktual, dan pesan error yang sudah dibersihkan dari data pribadi. Jangan kirim OTP, tautan login, token overlay, atau secret.
+
+## Pesan undangan beta terbatas
+Halo! Saya sedang menguji Bagisawer, platform tools livestream. Saya mencari kreator yang bersedia mencoba pendaftaran, profil, pengaturan overlay OBS, alert demo, dan Running Text, lalu melaporkan bug.
+
+Catatan: QRIS dan pembayaran nyata belum aktif. Fitur yang berlabel preview belum boleh diandalkan untuk siaran komersial. Coba https://bagisawer.my.id dan laporkan bug melalui https://github.com/Ndraaa444/Berisawer/issues/new?template=bug_report.yml.
+
+Terima kasih telah membantu menguji Bagisawer.
