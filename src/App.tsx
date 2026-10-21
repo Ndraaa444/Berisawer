@@ -12,6 +12,7 @@ import LiveOverlay from './LiveOverlay'
 import PublicCreator from './PublicCreator'
 
 type Section = 'Overview' | 'Donations' | 'Overlay' | 'Live Studio' | 'Settings'
+type OverlayFeature = { key: string; title: string; description: string }
 const navigation: { label: Section; icon: typeof LayoutDashboard }[] = [
   { label: 'Overview', icon: LayoutDashboard },
   { label: 'Donations', icon: Heart },
