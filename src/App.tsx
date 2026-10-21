@@ -20,12 +20,6 @@ const navigation: { label: Section; icon: typeof LayoutDashboard }[] = [
   { label: 'Settings', icon: Settings },
 ]
 
-const sampleDonations = [
-  { name: 'Ruang preview', message: 'Semangat terus stream-nya!', amount: 'Rp 25.000', time: 'Contoh data' },
-  { name: 'Supporter demo', message: 'Konten yang keren ✨', amount: 'Rp 10.000', time: 'Contoh data' },
-  { name: 'Teman stream', message: 'Gas terus!', amount: 'Rp 5.000', time: 'Contoh data' },
-]
-
 function formatMoney(value: number) {
   return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(value)
 }
@@ -286,7 +280,7 @@ function Dashboard() {
           <div className="secure-note"><ShieldCheck size={17} /><span><strong>Payment-safe mode</strong><small>Gateway nonaktif</small></span></div>
           <div className="profile-row">
             <div className="profile-avatar">{profileName.charAt(0).toUpperCase() || 'C'}</div>
-            <div className="profile-copy"><strong>{userEmail ? userEmail.split('@')[0] : 'Guest creator'}</strong><small>{userEmail ?? 'Preview workspace'}</small></div>
+            <div className="profile-copy"><strong>{userEmail ? userEmail.split('@')[0] : 'Guest creator'}</strong><small>{userEmail ?? 'Belum masuk'}</small></div>
             {userEmail && <button className="icon-button" title="Keluar" onClick={signOut}><LogOut size={16} /></button>}
           </div>
         </div>
@@ -301,7 +295,7 @@ function Dashboard() {
           </div>
           <div className="topbar-actions">
             {!userEmail && <button className="button button-primary" onClick={() => setSection('Settings')}>Daftar / Masuk</button>}
-            <span className="system-status"><span className="status-pulse" /> Preview mode</span>
+            <span className="system-status"><span className="status-pulse" /> {userEmail ? 'Terhubung' : 'Belum masuk'}</span>
             <button className="icon-button notification-button" aria-label="Notifikasi"><Bell size={18} /><i /></button>
             <div className="top-avatar">{profileName.charAt(0).toUpperCase() || 'C'}</div>
           </div>
@@ -310,7 +304,7 @@ function Dashboard() {
         <div className="content">
           <div className="notice-banner">
             <div className="notice-icon"><ShieldCheck size={18} /></div>
-            <div><strong>Pembayaran belum diaktifkan</strong><p>QRIS dan payment gateway tetap nonaktif sampai verifikasi merchant selesai. Angka pada dashboard adalah data contoh.</p></div>
+            <div><strong>Pembayaran belum diaktifkan</strong><p>QRIS dan payment gateway dinonaktifkan sampai merchant terverifikasi. Dashboard tidak akan menampilkan transaksi contoh sebagai data nyata.</p></div>
             <span className="notice-badge">AMAN</span>
           </div>
 
@@ -321,7 +315,7 @@ function Dashboard() {
           {section === 'Overlay' && <Overlay features={overlayFeatures} tokens={overlayTokens} busy={overlayBusy} copiedFeature={copiedFeature} showUrls={showUrls} urlFor={overlayUrl} onGenerate={generateOverlayTokens} onCopy={copyOverlay} onToggleUrl={feature => setShowUrls(current => ({ ...current, [feature]: !current[feature] }))} />}
           {section === 'Live Studio' && <LiveStudio />}
           {section === 'Settings' && <SettingsPanel profileName={profileName} setProfileName={setProfileName} handle={handle} setHandle={setHandle} bio={bio} setBio={setBio} profilePublic={profilePublic} setProfilePublic={setProfilePublic} onSave={saveProfile} saved={saved} profileLoading={profileLoading} email={email} setEmail={setEmail} otp={otp} setOtp={setOtp} otpSent={otpSent} onLogin={sendMagicLink} onVerifyOtp={verifyEmailOtp} authBusy={authBusy} userEmail={userEmail} />}
-          <footer className="footer"><span>© 2026 Bagisawer</span><span><span className="footer-dot" /> Sistem berjalan dalam mode preview</span></footer>
+          <footer className="footer"><span>© 2026 Bagisawer</span><span><span className="footer-dot" /> {userEmail ? 'Data akun terhubung' : 'Masuk untuk mengakses data akun'}</span></footer>
         </div>
       </main>
     </div>
@@ -362,20 +356,42 @@ function Overview({ onNavigate }: { onNavigate: (section: Section) => void }) {
 }
 
 function Donations() {
+  const [rows, setRows] = useState<Array<{id:string; donor_name:string; message:string; amount:number; created_at:string; status:string}>>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [query, setQuery] = useState('')
-  const filtered = sampleDonations.filter(d => d.name.toLowerCase().includes(query.toLowerCase()) || d.message.toLowerCase().includes(query.toLowerCase()))
+
+  useEffect(() => {
+    let alive = true
+    async function load() {
+      setLoading(true)
+      setError('')
+      if (!supabase) { setError('Backend belum dikonfigurasi. Riwayat transaksi tidak tersedia.'); setLoading(false); return }
+      const { data: auth, error: authError } = await supabase.auth.getUser()
+      if (authError || !auth.user) { setError('Masuk ke akun kreator untuk melihat riwayat transaksi milik akun ini.'); setRows([]); setLoading(false); return }
+      const { data, error: queryError } = await supabase.from('donations').select('id,donor_name,message,amount,created_at,status').eq('creator_id', auth.user.id).eq('status', 'paid').order('created_at', { ascending: false }).limit(100)
+      if (!alive) return
+      if (queryError) setError('Riwayat transaksi gagal dimuat dari database.')
+      else setRows((data ?? []) as typeof rows)
+      setLoading(false)
+    }
+    void load()
+    return () => { alive = false }
+  }, [])
+
+  const filtered = rows.filter(d => (d.donor_name ?? '').toLowerCase().includes(query.toLowerCase()) || (d.message ?? '').toLowerCase().includes(query.toLowerCase()))
   return <>
-    <PageHeading eyebrow="COMMUNITY SUPPORT" title="Riwayat sawer" description="Riwayat nyata akan muncul di sini setelah backend terhubung." />
-    <section className="panel table-panel"><div className="panel-heading"><div><h2>Transaksi terbaru</h2><p>Daftar contoh — bukan transaksi sungguhan</p></div><div className="search-box"><Activity size={15} /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Cari aktivitas..." aria-label="Cari aktivitas" /></div></div>
-      <div className="table-wrap"><table><thead><tr><th>SUPPORTER</th><th>PESAN</th><th>JUMLAH</th><th>WAKTU</th><th>STATUS</th></tr></thead><tbody>{filtered.map(d => <tr key={d.name}><td><div className="table-person"><span className="donor-avatar">{d.name.charAt(0)}</span><strong>{d.name}</strong></div></td><td>{d.message}</td><td className="table-amount">{d.amount}</td><td>{d.time}</td><td><span className="status-tag">CONTOH</span></td></tr>)}</tbody></table></div>
-      {filtered.length === 0 && <div className="empty-state">Tidak ada contoh aktivitas yang cocok dengan pencarian.</div>}
-      <div className="table-foot"><span>Menampilkan {filtered.length} data contoh</span><span>Data live belum tersedia</span></div>
+    <PageHeading eyebrow="COMMUNITY SUPPORT" title="Riwayat sawer" description="Menampilkan transaksi berstatus paid yang tersimpan di backend." />
+    <section className="panel table-panel"><div className="panel-heading"><div><h2>Transaksi terverifikasi</h2><p>Hanya transaksi nyata berstatus paid dari akun ini</p></div><div className="search-box"><Activity size={15} /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Cari transaksi..." aria-label="Cari transaksi" /></div></div>
+      {error && <div className="empty-state">{error}</div>}
+      {loading ? <div className="empty-state">Memuat transaksi dari database…</div> : <div className="table-wrap"><table><thead><tr><th>SUPPORTER</th><th>PESAN</th><th>JUMLAH</th><th>WAKTU</th><th>STATUS</th></tr></thead><tbody>{filtered.map(d => <tr key={d.id}><td><div className="table-person"><span className="donor-avatar">{(d.donor_name || 'A').charAt(0)}</span><strong>{d.donor_name || 'Anonim'}</strong></div></td><td>{d.message || '—'}</td><td className="table-amount">{formatMoney(Number(d.amount) || 0)}</td><td>{new Date(d.created_at).toLocaleString('id-ID')}</td><td><span className="status-tag">PAID</span></td></tr>)}</tbody></table></div>}
+      {!loading && !error && filtered.length === 0 && <div className="empty-state">Belum ada transaksi nyata berstatus paid untuk ditampilkan.</div>}
+      <div className="table-foot"><span>{loading ? 'Memuat…' : String(filtered.length) + ' transaksi nyata'}</span><span>Data berasal dari Supabase</span></div>
     </section>
-    <div className="info-card"><ShieldCheck size={19} /><div><strong>Integritas transaksi dijaga</strong><p>Dashboard tidak menganggap donasi sebagai lunas hanya berdasarkan input browser. Status pembayaran harus dikonfirmasi oleh webhook gateway setelah verifikasi merchant.</p></div></div>
+    <div className="info-card"><ShieldCheck size={19} /><div><strong>Integritas transaksi dijaga</strong><p>Transaksi pending, gagal, atau belum diverifikasi tidak ditampilkan sebagai pemasukan.</p></div></div>
   </>
 }
 
-type OverlayFeature = { key: string; title: string; description: string }
 function Overlay({ features, tokens, busy, copiedFeature, showUrls, urlFor, onGenerate, onCopy, onToggleUrl }: {
   features: OverlayFeature[]; tokens: Record<string, string>
   busy: boolean; copiedFeature: string; showUrls: Record<string, boolean>; urlFor: (feature: string) => string
