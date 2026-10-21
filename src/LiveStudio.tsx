@@ -16,18 +16,14 @@ const initialTools: { key: ToolKey; title: string; description: string; icon: ty
   { key: 'voice', title: 'Voice Chat / TTS', description: 'Bacakan pesan supporter dengan kontrol antrean dan moderasi.', icon: AudioLines, enabled: true, tag: 'AUDIO' },
   { key: 'media', title: 'Media Share', description: 'Antrian video/link dari penonton dengan filter dan persetujuan streamer.', icon: Music2, enabled: false, tag: 'BETA' },
   { key: 'ticker', title: 'Running Text', description: 'Teks berjalan untuk pengumuman, target, dan pesan komunitas.', icon: MessageSquareText, enabled: true, tag: 'OVERLAY' },
-  { key: 'subathon', title: 'Subathon Timer', description: 'Tambah waktu dari event yang sudah diverifikasi atau simulasi.', icon: Timer, enabled: true, tag: 'LIVE TOOL' },
+  { key: 'subathon', title: 'Subathon Timer', description: 'Timer live hanya aktif setelah event subathon backend tersedia.', icon: Timer, enabled: true, tag: 'LIVE TOOL' },
   { key: 'alerts', title: 'Alert & Event Animations', description: 'Alert sawer, supporter baru, target tercapai, dan event khusus.', icon: Zap, enabled: true, tag: 'OVERLAY' },
   { key: 'goals', title: 'Target Komunitas', description: 'Target dana, jumlah supporter, atau milestone streaming.', icon: Trophy, enabled: true, tag: 'GOAL' },
   { key: 'polls', title: 'Polling & Voting', description: 'Libatkan penonton untuk memilih tantangan atau konten berikutnya.', icon: Activity, enabled: false, tag: 'INTERAKSI' },
   { key: 'redeems', title: 'Request & Challenge', description: 'Permintaan lagu, tantangan, atau reward dengan antrean yang bisa dimoderasi.', icon: Sparkles, enabled: false, tag: 'INTERAKSI' },
 ]
 
-const initialQueue = [
-  { id: 1, title: 'Pesan penyemangat', detail: 'Contoh TTS • 8 detik', status: 'Menunggu' },
-  { id: 2, title: 'Media komunitas', detail: 'Contoh media • perlu persetujuan', status: 'Moderasi' },
-  { id: 3, title: 'Running text', detail: '“Makasih sudah mampir!”', status: 'Aktif' },
-]
+const initialQueue: { id: number; title: string; detail: string; status: string }[] = []
 
 export default function LiveStudio() {
   const [tools, setTools] = useState(initialTools)
@@ -36,7 +32,7 @@ export default function LiveStudio() {
   const [ticker, setTicker] = useState('Terima kasih sudah mendukung stream ini!')
   const [tickerDraft, setTickerDraft] = useState('Halo chat! Jangan lupa follow dan jaga suasana tetap nyaman ✨')
   const [goal, setGoal] = useState('500000')
-  const [goalCurrent, setGoalCurrent] = useState(175000)
+  const [goalCurrent] = useState(0)
   const [timerMinutes, setTimerMinutes] = useState('10')
   const [queue, setQueue] = useState(initialQueue)
   const [newRequest, setNewRequest] = useState('')
@@ -70,18 +66,7 @@ export default function LiveStudio() {
             if (typeof studio.pollB === 'string') setPollB(studio.pollB)
           }
         } else {
-          const raw = localStorage.getItem('berisawer-live-studio:preview')
-          if (raw) switches = JSON.parse(raw) as Record<string, boolean>
-          const studioRaw = localStorage.getItem('bagisawer-live-studio-settings:preview')
-          if (studioRaw) {
-            const studio = JSON.parse(studioRaw) as Record<string, unknown>
-            if (typeof studio.tickerDraft === 'string') setTickerDraft(studio.tickerDraft)
-            if (typeof studio.goalAmount === 'string') setGoal(studio.goalAmount)
-            if (typeof studio.timerMinutes === 'string') setTimerMinutes(studio.timerMinutes)
-            if (typeof studio.pollTitle === 'string') setPollTitle(studio.pollTitle)
-            if (typeof studio.pollA === 'string') setPollA(studio.pollA)
-            if (typeof studio.pollB === 'string') setPollB(studio.pollB)
-          }
+          if (alive) setMessage('Masuk ke akun kreator untuk memuat pengaturan live yang tersimpan di server.')
         }
         if (alive && switches) setTools(current => current.map(tool => typeof switches?.[tool.key] === 'boolean' ? { ...tool, enabled: switches[tool.key] } : tool))
       } catch {
@@ -115,8 +100,8 @@ export default function LiveStudio() {
         setMessage('Gagal menyimpan switch ke Supabase. Tampilan berubah sementara, tetapi server belum terbarui.')
       }
     } else {
-      localStorage.setItem('berisawer-live-studio:preview', JSON.stringify(switches))
-      setMessage('Switch disimpan di browser preview ini saja. Masuk untuk menyinkronkan ke akun.')
+      setTools(current => current.map(tool => tool.key === key ? { ...tool, enabled: !tool.enabled } : tool))
+      setMessage('Masuk ke akun kreator untuk mengubah switch yang tersimpan di server.')
     }
   }
 
@@ -142,8 +127,7 @@ export default function LiveStudio() {
         if (error) throw error
         setMessage('Pengaturan Live Studio tersimpan permanen ke Supabase.')
       } else {
-        localStorage.setItem('bagisawer-live-studio-settings:preview', JSON.stringify(studio))
-        setMessage('Pengaturan tersimpan di browser ini saja. Masuk ke akun untuk menyinkronkan ke Supabase.')
+        setMessage('Masuk ke akun kreator untuk menyimpan pengaturan ke Supabase.')
       }
     } catch {
       setMessage('Pengaturan Live Studio gagal disimpan ke server. Periksa koneksi dan izin tabel; perubahan belum dianggap tersimpan.')
@@ -151,11 +135,7 @@ export default function LiveStudio() {
   }
 
   function addQueueItem() {
-    const text = newRequest.trim()
-    if (!text) return
-    setQueue(current => [...current, { id: Date.now(), title: text.slice(0, 80), detail: 'Permintaan preview • menunggu moderasi', status: 'Moderasi' }])
-    setNewRequest('')
-    setMessage('Permintaan contoh ditambahkan ke antrean moderasi.')
+    setMessage('Antrean request belum tersedia di backend produksi. Permintaan tidak disimpan dan tidak ditampilkan sebagai aktivitas nyata.')
   }
 
   async function publishTicker() {
@@ -181,25 +161,24 @@ export default function LiveStudio() {
   }
 
   function addTimer() {
-    const minutes = Math.max(1, Math.min(180, Number(timerMinutes) || 1))
-    setMessage(`Simulasi: ${minutes} menit ditambahkan ke subathon. Timer live belum tersambung.`)
+    setMessage('Subathon belum tersambung ke event backend produksi. Timer tidak diubah dan tidak ada simulasi yang ditampilkan.')
   }
 
   return <div className="live-studio">
-    <div className="page-heading"><div><div className="eyebrow">STREAMER TOOLKIT</div><h1>Live Studio</h1><p>Kelola interaksi livestream, overlay, antrean, dan aktivitas komunitas dari satu tempat.</p></div><div className="heading-action"><button className="button button-secondary" type="button" onClick={saveStudioSettings}><Save size={15} /> Simpan pengaturan</button><span className="live-preview-pill"><span /> PREVIEW MODE</span></div></div>
-    <div className="live-safety-banner"><ShieldCheck size={20} /><div><strong>Mode aman aktif — pembayaran tetap nonaktif</strong><p>Sudah terhubung: profil akun, token overlay, alert demo, Running Text, pengaturan suara/TTS, filter moderasi, dan penyimpanan switch. Masih preview: timer subathon, target komunitas, polling, antrean request, dan media share; belum terhubung ke chat YouTube/Twitch atau donasi nyata.</p></div></div>
+    <div className="page-heading"><div><div className="eyebrow">STREAMER TOOLKIT</div><h1>Live Studio</h1><p>Kelola interaksi livestream, overlay, antrean, dan aktivitas komunitas dari satu tempat.</p></div><div className="heading-action"><button className="button button-secondary" type="button" onClick={saveStudioSettings}><Save size={15} /> Simpan pengaturan</button><span className="live-preview-pill"><span /> {userId ? 'DATA AKUN' : 'LOGIN DIPERLUKAN'}</span></div></div>
+    <div className="live-safety-banner"><ShieldCheck size={20} /><div><strong>Mode aman aktif — pembayaran tetap nonaktif</strong><p>Fitur yang benar-benar terhubung saat ini: penyimpanan pengaturan akun, Running Text ke antrean overlay, dan alert sintetis khusus pengujian. Subathon, target, polling, request, media share, serta integrasi chat belum aktif di backend produksi dan tidak akan ditampilkan sebagai aktivitas nyata.</p></div></div>
     {message && <div className="live-feedback" role="status"><Check size={16} />{message}<button onClick={() => setMessage('')} aria-label="Tutup pesan">×</button></div>}
     <div className="live-stats-grid">
-      <div className="live-stat"><span>Tools aktif</span><strong>{enabledCount}<small> / {tools.length}</small></strong><span className="live-stat-foot">{userId ? 'Disimpan di akun' : 'Konfigurasi preview'}</span></div>
-      <div className="live-stat"><span>Antrean interaksi</span><strong>{queue.length}</strong><span className="live-stat-foot">Item simulasi</span></div>
-      <div className="live-stat"><span>Target komunitas</span><strong>{goalPercent}%</strong><span className="live-stat-foot">{new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',maximumFractionDigits:0}).format(goalCurrent)} terkumpul (contoh)</span></div>
+      <div className="live-stat"><span>Tools aktif</span><strong>{enabledCount}<small> / {tools.length}</small></strong><span className="live-stat-foot">{userId ? 'Konfigurasi akun' : 'Login diperlukan'}</span></div>
+      <div className="live-stat"><span>Antrean interaksi</span><strong>{queue.length}</strong><span className="live-stat-foot">Event backend tersimpan</span></div>
+      <div className="live-stat"><span>Target komunitas</span><strong>{goalPercent}%</strong><span className="live-stat-foot">Total dukungan terverifikasi akan tampil setelah alur pembayaran aktif</span></div>
     </div>
     <section className="panel live-config-panel" style={{marginBottom:24}}><div className="panel-heading"><div><h2><Zap size={17} /> Uji alert overlay</h2><p>Kirim event sintetis ke overlay akun untuk menguji suara, TTS, moderasi, dan koneksi OBS. Tidak membuat donasi atau pembayaran.</p></div><span className="live-mini-status">DEMO AMAN</span></div><button className="button button-primary" disabled={!userId || !supabase} onClick={async () => { if (!supabase || !userId) { setMessage('Login kreator diperlukan untuk mengirim demo ke overlay.'); return } setMessage('Mengirim alert demo ke overlay…'); const { data, error } = await supabase.functions.invoke('live-studio-event', { body: { event_type: 'demo_alert', payload: { message: 'Ini adalah alert demo Bagisawer. Tidak ada pembayaran yang dilakukan.' } } }); if (error || !data?.event) { setMessage(data?.error === 'alerts_disabled' ? 'Aktifkan fitur Alert di atas terlebih dahulu.' : 'Alert demo gagal dikirim. Pastikan Edge Function live-studio-event sudah diperbarui.'); return } setMessage('Alert demo terkirim. Buka overlay Alerts di OBS/browser untuk mendengar Shine/TTS. Tidak ada transaksi uang.'); }}><Zap size={15} /> Kirim alert demo</button><p className="field-help">Gunakan URL overlay dengan fitur <code>alerts</code>. Untuk browser OBS, aktifkan audio pada Browser Source dan pastikan tab tidak dibisukan.</p></section>
     <div className="live-section-heading"><div><h2>Semua live tools</h2><p>Aktifkan atau nonaktifkan modul. {settingsLoaded ? (userId ? 'Pengaturan akun dimuat.' : 'Mode preview lokal.') : 'Memuat pengaturan…'}</p></div><span className="live-section-counter">{enabledCount} AKTIF</span></div>
     <div className="live-tool-grid">{tools.map(tool => { const Icon = tool.icon; return <article className={`live-tool-card ${tool.enabled ? 'tool-enabled' : ''}`} key={tool.key}>
       <div className="live-tool-top"><span className="live-tool-icon"><Icon size={20} /></span><span className="live-tool-tag">{tool.tag}</span></div>
       <div className="live-tool-copy"><h3>{tool.title}</h3><p>{tool.description}</p></div>
-      <div className="live-tool-bottom"><span className={tool.enabled ? 'tool-state state-on' : 'tool-state'}>{tool.enabled ? (userId ? 'Aktif • akun tersimpan' : 'Aktif di preview') : 'Nonaktif'}</span><button className={`live-toggle ${tool.enabled ? 'toggle-on' : ''}`} onClick={() => toggleTool(tool.key)} aria-label={`${tool.enabled ? 'Nonaktifkan' : 'Aktifkan'} ${tool.title}`}>{tool.enabled ? <ToggleRight size={28} /> : <ToggleLeft size={28} />}</button></div>
+      <div className="live-tool-bottom"><span className={tool.enabled ? 'tool-state state-on' : 'tool-state'}>{tool.enabled ? (userId ? 'Aktif • akun tersimpan' : 'Belum tersimpan di server') : 'Nonaktif'}</span><button className={`live-toggle ${tool.enabled ? 'toggle-on' : ''}`} onClick={() => toggleTool(tool.key)} aria-label={`${tool.enabled ? 'Nonaktifkan' : 'Aktifkan'} ${tool.title}`}>{tool.enabled ? <ToggleRight size={28} /> : <ToggleLeft size={28} />}</button></div>
     </article> })}</div>
     <div className="live-config-grid">
       <section className="panel live-config-panel"><div className="panel-heading"><div><h2><MessageSquareText size={17} /> Running Text</h2><p>Konten teks untuk browser overlay</p></div><span className="live-mini-status">LOCAL</span></div>
