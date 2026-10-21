@@ -54,7 +54,7 @@ Deno.serve(async (req: Request) => {
   }
   // Synthetic test event only: never creates a donation row or payment transaction.
   if (config?.tool_switches?.alerts === false || config?.alerts?.enabled === false) return reply(403, { error: "alerts_disabled" });
-  const demoMessage = String(body?.payload?.message ?? "Ini adalah alert demo Berisawer. Tidak ada pembayaran yang dilakukan.").trim().slice(0, 240);
+  const demoMessage = String(body?.payload?.message ?? "Ini adalah alert demo Bagisawer. Tidak ada pembayaran yang dilakukan.").trim().slice(0, 240);
   const safeMessage = moderate(demoMessage, rules);
   if (safeMessage === null) return reply(422, { error: "message_blocked_by_moderation" });
   const { data: event, error: insertError } = await admin.from("overlay_events").insert({ creator_id: authData.user.id, event_type: "alert", payload: { demo: true, donor_name: "Supporter Demo", amount: 10000, message: safeMessage, display_seconds: 8 } }).select("id,event_type,created_at").single();
