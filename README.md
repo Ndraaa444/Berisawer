@@ -5,11 +5,11 @@ Futuristic creator tipping dashboard and browser overlay, built with React, Type
 ## Current scope
 
 - Responsive creator console with overview, donation preview, overlay setup, and profile settings.
-- Supabase magic-link sign-in when public Supabase environment values are configured.
+- Supabase email OTP sign-in when public Supabase environment values are configured.
 - TypeScript strict checks and production build in GitHub Actions.
 - Cloudflare Pages deployment workflow is opt-in and will run only when repository variable `CLOUDFLARE_PAGES_ENABLED=true` is set on `main`.
 
-> **Payments are intentionally disabled.** QRIS and payment gateway integration must remain off until merchant verification and end-to-end webhook testing are complete. Dashboard activity and metrics shown before live backend integration are sample data only. Overlay URL shown in the UI is a placeholder, not a working token.
+> **Payments are intentionally disabled.** QRIS and payment gateway integration must remain off until merchant verification and end-to-end webhook testing are complete. Dashboard activity and metrics shown before live backend integration are sample data only. Overlay URLs use stable per-feature token IDs. Keep token URLs private and revoke them if shared unintentionally.
 
 ## Local development
 
